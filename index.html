@@ -152,24 +152,41 @@
       }
     }
 
-    fileInput.onchange=async()=>{
-      resetAll(); const f=fileInput.files[0]; if(!f) return;
-      mode=f.type.includes('gif')?'gif':f.type.includes('mp4')?'mp4':f.type.includes('webm')?'webm':/\.json$/.test(f.name)?'lottie':null;
-      if(mode==='gif')    gifActions.style.display    = '';
-      if(mode==='mp4')    mp4Actions.style.display    = '';
-      if(mode==='webm')   webmActions.style.display   = '';
-      if(mode==='lottie') lottieActions.style.display = '';
-      if(mode==='gif')    arrayBuffer=await f.arrayBuffer();
+    fileInput.onchange = async () => {
+      const f = fileInput.files[0];
+      if (!f) return;
+      // hide previous actions and UI
+      [gifActions, mp4Actions, webmActions, lottieActions].forEach(s => s.style.display = 'none');
+      previewBox.innerHTML = '';
+      downloadBtn.disabled = true;
+
+      // detect type and show actions
+      mode = f.type.includes('gif') ? 'gif'
+           : f.type.includes('mp4') ? 'mp4'
+           : f.type.includes('webm') ? 'webm'
+           : /\.json$/.test(f.name)? 'lottie'
+           : null;
+      if (mode === 'gif')    gifActions.style.display = '';
+      if (mode === 'mp4')    mp4Actions.style.display = '';
+      if (mode === 'webm')   webmActions.style.display = '';
+      if (mode === 'lottie') lottieActions.style.display = '';
+
+      if (mode === 'gif') {
+        arrayBuffer = await f.arrayBuffer();
+      }
 
       // immediate preview
-      previewBox.innerHTML='';
-      if(/gif|mp4|webm/.test(mode)){
-        const m=mode==='gif'?document.createElement('img'):document.createElement('video');
-        m.controls=true; m.src=URL.createObjectURL(f); previewBox.appendChild(m);
-      } else if(mode==='lottie'){
-        const buf=await f.arrayBuffer(); lottieData=JSON.parse(new TextDecoder().decode(buf));
-        const cont=document.createElement('div'); previewBox.appendChild(cont);
-        lottie.loadAnimation({container:cont,renderer:'svg',loop:true,autoplay:true,animationData:lottieData});
+      if (/gif|mp4|webm/.test(mode)) {
+        const media = mode === 'gif' ? document.createElement('img') : document.createElement('video');
+        media.controls = true;
+        media.src = URL.createObjectURL(f);
+        previewBox.appendChild(media);
+      } else if (mode === 'lottie') {
+        const buf = await f.arrayBuffer();
+        lottieData = JSON.parse(new TextDecoder().decode(buf));
+        const cont = document.createElement('div');
+        previewBox.appendChild(cont);
+        lottie.loadAnimation({ container: cont, renderer: 'svg', loop: true, autoplay: true, animationData: lottieData });
       }
     };
 
