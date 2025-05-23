@@ -125,7 +125,7 @@
         b.style.display = 'inline-block';
         b.disabled = true;
       });
-      fileInput.value = '';
+      // **don't clear fileInput here** so user can pick
     }
 
     fileInput.addEventListener('change', async () => {
@@ -203,7 +203,7 @@
             framesArr,
             60,
             0.5,
-            p => { progressBar.value = p * 100; }
+            p => progressBar.value = p * 100
           );
           previewLottieResult(lottieData);
           dlLottie.disabled = false;
