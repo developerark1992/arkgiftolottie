@@ -59,7 +59,7 @@
     <div class="section">
       <h3>1. Original GIF</h3>
       <img id="gifPreview"
-           src="favicon.png"
+           src="https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif"
            alt="No GIF selected" />
     </div>
 
@@ -86,6 +86,9 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
+    // Allow up to 50 MB GIFs
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
     const gifInput         = document.getElementById('gifInput');
     const fileNameInput    = document.getElementById('fileNameInput');
     const frameCountInput  = document.getElementById('frameCountInput');
@@ -99,12 +102,13 @@
     const lottieContainer  = document.getElementById('lottieContainer');
     const downloadLottieBtn= document.getElementById('downloadLottieBtn');
     const resetBtn         = document.getElementById('resetBtn');
+    const gifPreview       = document.getElementById('gifPreview');
 
     let gifFrames = null, lottieData = null;
     const fps = 30, videoMime = 'video/webm; codecs=vp8,opus';
 
     gifInput.addEventListener('change', async () => {
-      // only clear previous previews/UI, do NOT fully reset everything
+      // clear only previews/UI
       lottieContainer.innerHTML = '';
       videoPreview.src = '';
       progressWrap.style.display = 'none';
@@ -112,14 +116,27 @@
       statusText.textContent = '';
       downloadLottieBtn.disabled = true;
       resetBtn.disabled = true;
+      convertBtn.disabled = true;
 
       const file = gifInput.files[0];
       if (!file) return;
+
+      if (file.size > MAX_FILE_SIZE) {
+        alert('That GIF is too large (>50 MB). Please pick one under 50 MB.');
+        return;
+      }
+
       gifPreview.src = URL.createObjectURL(file);
-      const buf = await file.arrayBuffer();
-      const parsed = parseGIF(buf);
-      gifFrames = decompressFrames(parsed, true);
-      convertBtn.disabled = !gifFrames.length;
+
+      try {
+        const buf    = await file.arrayBuffer();
+        const parsed = parseGIF(buf);
+        gifFrames    = decompressFrames(parsed, true);
+        convertBtn.disabled = !gifFrames.length;
+      } catch (err) {
+        console.error(err);
+        alert('Failed to decode GIF. Please try a different one.');
+      }
     });
 
     convertBtn.addEventListener('click', async () => {
@@ -136,7 +153,7 @@
       lottieData = await buildLottieFromGif(
         gifFrames,
         parseInt(frameCountInput.value),
-        parseFloat(scaleInput.value)/100,
+        parseFloat(scaleInput.value) / 100,
         p => progressBar.value = 50 + p * 50
       );
 
@@ -144,14 +161,14 @@
       statusText.textContent = 'Complete!';
       previewLottie(lottieData);
       downloadLottieBtn.disabled = false;
-      resetBtn.disabled = false;  // now allow reset
+      resetBtn.disabled = false;
     });
 
     downloadLottieBtn.addEventListener('click', () => {
       const base = fileNameInput.value.trim() || 'animation';
-      const blob = new Blob([JSON.stringify(lottieData,null,2)], { type:'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      const blob = new Blob([JSON.stringify(lottieData, null, 2)], { type:'application/json' });
+      const a    = document.createElement('a');
+      a.href     = URL.createObjectURL(blob);
       a.download = base + '.json';
       a.click();
     });
@@ -161,17 +178,18 @@
     function recordWebM(frames, fps, onProg) {
       return new Promise(res => {
         const c = document.createElement('canvas');
-        c.width = frames[0].dims.width; c.height = frames[0].dims.height;
-        const ctx = c.getContext('2d');
+        c.width = frames[0].dims.width;
+        c.height = frames[0].dims.height;
+        const ctx    = c.getContext('2d');
         const stream = c.captureStream(fps);
-        const rec = new MediaRecorder(stream, { mimeType: videoMime });
+        const rec    = new MediaRecorder(stream, { mimeType: videoMime });
         const chunks = [];
         rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-        rec.onstop = () => res();
+        rec.onstop         = () => res();
         rec.start();
 
         let i = 0, delay = 1000 / fps;
-        (function draw(){
+        (function draw() {
           if (i >= frames.length) return rec.stop();
           const f = frames[i++];
           ctx.putImageData(
@@ -186,13 +204,13 @@
 
     async function buildLottieFromGif(frames, total, scale, onProg) {
       const origW = frames[0].dims.width, origH = frames[0].dims.height;
-      const picks = Array.from({length:total}, (_,i)=>Math.floor(i*frames.length/total));
-      const W = Math.floor(origW*scale), H = Math.floor(origH*scale);
+      const picks = Array.from({length:total}, (_,i) => Math.floor(i * frames.length / total));
+      const W     = Math.floor(origW * scale), H = Math.floor(origH * scale);
       const canvas = document.createElement('canvas');
-      canvas.width = W; canvas.height = H;
+      canvas.width  = W; canvas.height = H;
       const ctx = canvas.getContext('2d');
       const tmp = document.createElement('canvas');
-      tmp.width = origW; tmp.height = origH;
+      tmp.width  = origW; tmp.height = origH;
       const tctx = tmp.getContext('2d');
 
       const images = picks.map((idx,i) => {
@@ -202,15 +220,15 @@
           0, 0
         );
         ctx.clearRect(0,0,W,H);
-        ctx.drawImage(tmp,0,0,origW,origH,0,0,W,H);
-        onProg((i+1)/total);
+        ctx.drawImage(tmp, 0, 0, origW, origH, 0, 0, W, H);
+        onProg((i + 1) / total);
         return canvas.toDataURL('image/png');
       });
 
-      const assets = images.map((d,i)=>({
+      const assets = images.map((d,i) => ({
         id:`img_${i}`, w:W, h:H, p:d, e:1
       }));
-      const layers = images.map((_,i)=>({
+      const layers = images.map((_,i) => ({
         ddd:0, ind:i+1, ty:2, refId:`img_${i}`,
         ks:{
           o:{a:0,k:100}, r:{a:0,k:0},
@@ -241,7 +259,7 @@
 
     function resetAll() {
       gifInput.value = '';
-      document.getElementById('gifPreview').src =
+      gifPreview.src =
         'https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif';
       videoPreview.src = '';
       lottieContainer.innerHTML = '';
