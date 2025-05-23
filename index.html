@@ -82,27 +82,51 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
-    const fileInput        = document.getElementById('fileInput');
-    const fileNameIn       = document.getElementById('fileName');
-    const btnWebM          = document.getElementById('toWebM');
-    const btnMP4           = document.getElementById('toMP4');
-    const btnGIF           = document.getElementById('toGIF');
-    const btnLottie        = document.getElementById('toLottie');
-    const progressContainer= document.getElementById('progressContainer');
-    const progressBar      = document.getElementById('progressBar');
-    const statusText       = document.getElementById('status');
-    const vidPrev          = document.getElementById('previewVideo');
-    const imgPrev          = document.getElementById('previewImg');
-    const lottPrev         = document.getElementById('lottieContainer');
-    const dlWebM           = document.getElementById('dlWebM');
-    const dlMP4            = document.getElementById('dlMP4');
-    const dlGIFBtn         = document.getElementById('dlGIF');
-    const dlLottie         = document.getElementById('dlLottie');
-    const downloadsDiv     = document.querySelector('.downloads');
+    // Get DOM elements
+    const fileInput         = document.getElementById('fileInput');
+    const fileNameIn        = document.getElementById('fileName');
+    const btnWebM           = document.getElementById('toWebM');
+    const btnMP4            = document.getElementById('toMP4');
+    const btnGIF            = document.getElementById('toGIF');
+    const btnLottie         = document.getElementById('toLottie');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar       = document.getElementById('progressBar');
+    const statusText        = document.getElementById('status');
+    const previewVideo      = document.getElementById('previewVideo');
+    const previewImg        = document.getElementById('previewImg');
+    const lottieContainer   = document.getElementById('lottieContainer');
+    const dlWebM            = document.getElementById('dlWebM');
+    const dlMP4             = document.getElementById('dlMP4');
+    const dlGIF             = document.getElementById('dlGIF');
+    const dlLottie          = document.getElementById('dlLottie');
+    const downloadsDiv      = document.querySelector('.downloads');
 
     let mode, arrayBuffer, gifFrames, blobs = {}, lottieData;
     const fps = 30;
 
+    // Define resetAll before it's used
+    function resetAll() {
+      blobs = {};
+      gifFrames = null;
+      lottieData = null;
+      previewVideo.style.display = 'none';
+      previewVideo.src = '';
+      previewImg.style.display = 'none';
+      previewImg.src = '';
+      lottieContainer.innerHTML = '';
+      downloadsDiv.style.display = 'none';
+      [dlWebM, dlMP4, dlGIF, dlLottie].forEach(b => b.disabled = true);
+      progressContainer.style.display = 'none';
+      progressBar.value = 0;
+      statusText.textContent = '';
+      // hide & disable all conversion buttons
+      [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => {
+        b.style.display = 'inline-block';
+        b.disabled = true;
+      });
+    }
+
+    // Wire up file input
     fileInput.addEventListener('change', async () => {
       resetAll();
       const f = fileInput.files[0];
@@ -112,105 +136,107 @@
            : f.type.includes('webm') ? 'webm'
            : null;
 
-      // Show & enable all buttons, then hide the one matching the mode
-      [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => {
-        b.style.display = 'inline-block';
-        b.disabled = false;
-      });
+      // Show & enable buttons, then hide the one matching mode
+      [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => b.style.display = 'inline-block');
       if (mode === 'gif')  btnGIF.style.display = 'none';
       if (mode === 'mp4')  btnMP4.style.display = 'none';
       if (mode === 'webm') btnWebM.style.display = 'none';
 
-      btnLottie.disabled = false;
+      [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => b.disabled = false);
 
       if (mode === 'gif') arrayBuffer = await f.arrayBuffer();
     });
 
-    btnWebM.onclick   = () => run('webm');
-    btnMP4.onclick    = () => run('mp4');
-    btnGIF.onclick    = () => run('gif');
-    btnLottie.onclick = () => run('lottie');
+    // Button handlers
+    btnWebM.onclick   = () => runConversion('webm');
+    btnMP4.onclick    = () => runConversion('mp4');
+    btnGIF.onclick    = () => runConversion('gif');
+    btnLottie.onclick = () => runConversion('lottie');
 
-    dlWebM.onclick    = () => downloadBlob('webm','.webm');
-    dlMP4.onclick     = () => downloadBlob('mp4','.mp4');
-    dlGIFBtn.onclick  = () => downloadBlob('gif','.gif');
-    dlLottie.onclick  = () => downloadBlob('lottie','.json');
+    // Download handlers
+    dlWebM.onclick    = () => downloadBlob('webm', '.webm');
+    dlMP4.onclick     = () => downloadBlob('mp4', '.mp4');
+    dlGIF.onclick     = () => downloadBlob('gif', '.gif');
+    dlLottie.onclick  = () => downloadBlob('lottie', '.json');
 
-    async function run(target) {
+    async function runConversion(target) {
       downloadsDiv.style.display = 'none';
       disableAllButtons();
       showProgress(`Converting to ${target.toUpperCase()}…`);
       if (target === 'lottie') {
-        if (mode !== 'webm') await convert('webm');
-        await convert('lottie');
+        if (mode !== 'webm') await doConvert('webm');
+        await doConvert('lottie');
       } else {
-        await convert(target);
+        await doConvert(target);
       }
     }
 
-    async function convert(type) {
+    async function doConvert(type) {
       switch (type) {
         case 'webm':
           blobs.webm = await convertCanvas(
             mode === 'gif' ? getGifFrames() : getVideoFrames(fileInput.files[0]),
             'video/webm; codecs=vp8,opus'
           );
-          previewVideo(blobs.webm); dlWebM.disabled = false; break;
+          previewVideoResult(blobs.webm);
+          dlWebM.disabled = false;
+          break;
 
         case 'mp4':
           blobs.mp4 = await convertCanvas(
             mode === 'gif' ? getGifFrames() : getVideoFrames(fileInput.files[0]),
             'video/mp4; codecs="avc1.42E01E,mp4a.40.2"'
           );
-          previewVideo(blobs.mp4); dlMP4.disabled = false; break;
+          previewVideoResult(blobs.mp4);
+          dlMP4.disabled = false;
+          break;
 
         case 'gif':
-          blobs.gif = new Blob([arrayBuffer], { type:'image/gif' });
-          previewImg(blobs.gif); dlGIFBtn.disabled = false; break;
+          blobs.gif = new Blob([arrayBuffer], { type: 'image/gif' });
+          previewImageResult(blobs.gif);
+          dlGIF.disabled = false;
+          break;
 
         case 'lottie':
-          const frames = mode==='gif' ? getGifFrames() : await getVideoFrames(fileInput.files[0]);
-          lottieData = await buildLottie(frames, 60, 0.5, p=>progressBar.value = p*100);
-          previewLottie(lottieData); dlLottie.disabled = false; break;
+          const frames = (mode === 'gif' ? getGifFrames() : await getVideoFrames(fileInput.files[0]));
+          lottieData = await buildLottie(frames, 60, 0.5, p => progressBar.value = p * 100);
+          previewLottieResult(lottieData);
+          dlLottie.disabled = false;
+          break;
       }
       downloadsDiv.style.display = '';
       showProgress(`${type.toUpperCase()} ready!`, 1);
     }
 
-    function downloadBlob(key, ext) {
-      let blob = blobs[key];
-      if (key === 'lottie') blob = new Blob([JSON.stringify(lottieData,null,2)],{type:'application/json'});
-      const a = document.createElement('a'), base = fileNameIn.value.trim()||'output';
-      a.href = URL.createObjectURL(blob); a.download = base + ext; a.click();
-    }
-
     function disableAllButtons() {
       [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => b.disabled = true);
     }
-    function showProgress(text, percent=0) {
+
+    function showProgress(text, fraction = 0) {
       progressContainer.style.display = '';
       statusText.textContent = text;
-      progressBar.value = percent * 100;
+      progressBar.value = fraction * 100;
     }
 
     async function convertCanvas(framesPromise, mime) {
       const frames = await framesPromise;
       return new Promise(res => {
         const c = document.createElement('canvas');
-        c.width = frames[0].dims.width; c.height = frames[0].dims.height;
+        c.width = frames[0].dims.width;
+        c.height = frames[0].dims.height;
         const ctx = c.getContext('2d');
         const stream = c.captureStream(fps);
-        const rec = new MediaRecorder(stream,{mimeType:mime});
+        const rec = new MediaRecorder(stream, { mimeType: mime });
         const chunks = [];
-        rec.ondataavailable = e=>chunks.push(e.data);
-        rec.onstop = ()=>res(new Blob(chunks,{type:mime}));
+        rec.ondataavailable = e => chunks.push(e.data);
+        rec.onstop = () => res(new Blob(chunks, { type: mime }));
         rec.start();
-        frames.forEach((f,i) => {
-          setTimeout(()=>{
-            ctx.putImageData(new ImageData(f.patch,f.dims.width,f.dims.height),0,0);
-            progressBar.value = (i+1)/frames.length * 100;
-            if (i===frames.length-1) rec.stop();
-          }, i*(1000/fps));
+        frames.forEach((f, i) => {
+          setTimeout(() => {
+            ctx.putImageData(new ImageData(f.patch, f.dims.width, f.dims.height), 0, 0);
+            progressBar.value = ((i + 1) / frames.length) * 100;
+            if (i === frames.length - 1) rec.stop();
+          }, i * (1000 / fps));
         });
       });
     }
@@ -218,69 +244,91 @@
     async function getVideoFrames(file) {
       const vid = document.createElement('video');
       vid.src = URL.createObjectURL(file);
-      vid.muted=true; vid.playsInline=true; vid.preload='auto'; vid.load();
-      await once(vid,'loadeddata');
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.preload = 'auto';
+      vid.load();
+      await once(vid, 'loadeddata');
       const c = document.createElement('canvas');
-      c.width = vid.videoWidth; c.height = vid.videoHeight;
-      const ctx = c.getContext('2d'), frames=[];
-      const total = Math.floor(vid.duration*fps);
-      for(let i=0;i<total;i++){
-        vid.currentTime = i/fps; await once(vid,'seeked');
-        ctx.drawImage(vid,0,0);
-        frames.push({patch: ctx.getImageData(0,0,c.width,c.height).data, dims:{width:c.width,height:c.height}});
+      c.width = vid.videoWidth;
+      c.height = vid.videoHeight;
+      const ctx = c.getContext('2d');
+      const frames = [];
+      const total = Math.floor(vid.duration * fps);
+      for (let i = 0; i < total; i++) {
+        vid.currentTime = i / fps;
+        await once(vid, 'seeked');
+        ctx.drawImage(vid, 0, 0);
+        frames.push({
+          patch: ctx.getImageData(0, 0, c.width, c.height).data,
+          dims: { width: c.width, height: c.height }
+        });
       }
       return frames;
     }
 
     function getGifFrames() {
-      if (!gifFrames) gifFrames = decompressFrames(parseGIF(arrayBuffer), true);
+      if (!gifFrames) {
+        gifFrames = decompressFrames(parseGIF(arrayBuffer), true);
+      }
       return Promise.resolve(gifFrames);
     }
 
     async function buildLottie(frames, total, scale, onProg) {
-      const picks = Array.from({length:total},(_,i)=>Math.floor(i*frames.length/total));
+      const picks = Array.from({ length: total }, (_, i) => Math.floor(i * frames.length / total));
       const ow = frames[0].dims.width, oh = frames[0].dims.height;
-      const W = Math.floor(ow*scale), H = Math.floor(oh*scale);
+      const W = Math.floor(ow * scale), H = Math.floor(oh * scale);
       const c = document.createElement('canvas');
-      c.width=W; c.height=H;
-      const ctx=c.getContext('2d'),
-            tmp=document.createElement('canvas');
-      tmp.width=ow; tmp.height=oh;
-      const tctx=tmp.getContext('2d');
-      const imgs = picks.map((idx,i)=>{
+      c.width = W; c.height = H;
+      const ctx = c.getContext('2d');
+      const tmp = document.createElement('canvas');
+      tmp.width = ow; tmp.height = oh;
+      const tctx = tmp.getContext('2d');
+      const imgs = picks.map((idx, i) => {
         const f = frames[idx];
-        tctx.putImageData(new ImageData(f.patch,ow,oh),0,0);
-        ctx.clearRect(0,0,W,H);
-        ctx.drawImage(tmp,0,0,ow,oh,0,0,W,H);
-        onProg((i+1)/total);
+        tctx.putImageData(new ImageData(f.patch, ow, oh), 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.drawImage(tmp, 0, 0, ow, oh, 0, 0, W, H);
+        onProg((i + 1) / total);
         return c.toDataURL('image/png');
       });
-      const assets = imgs.map((d,i)=>({id:`img_${i}`,p:d,w:W,h:H,e:1}));
-      const layers = imgs.map((_,i)=>({
-        ddd:0,ind:i+1,ty:2,refId:`img_${i}`,
-        ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[W/2,H/2,0]},a:{a:0,k:[W/2,H/2,0]},s:{a:0,k:[100,100,100]}},
-        ip:i,op:i+1,st:0,bm:0
+      const assets = imgs.map((d, i) => ({ id: `img_${i}`, p: d, w: W, h: H, e: 1 }));
+      const layers = imgs.map((_, i) => ({
+        ddd: 0, ind: i + 1, ty: 2, refId: `img_${i}`,
+        ks: {
+          o: { a: 0, k: 100 }, r: { a: 0, k: 0 },
+          p: { a: 0, k: [W / 2, H / 2, 0] },
+          a: { a: 0, k: [W / 2, H / 2, 0] },
+          s: { a: 0, k: [100, 100, 100] }
+        },
+        ip: i, op: i + 1, st: 0, bm: 0
       }));
-      return {v:"5.7.4",fr:fps,ip:0,op:imgs.length,w:W,h:H,nm:"Lottie",ddd:0,assets,layers};
+      return { v: "5.7.4", fr: fps, ip: 0, op: imgs.length, w: W, h: H, nm: "Lottie", ddd: 0, assets, layers };
     }
 
-    function previewVideo(blob) {
-      vidPrev.src=URL.createObjectURL(blob);
-      vidPrev.style.display='';
+    function previewVideoResult(blob) {
+      previewVideo.src = URL.createObjectURL(blob);
+      previewVideo.style.display = '';
     }
-    function previewImg(blob) {
-      imgPrev.src=URL.createObjectURL(blob);
-      imgPrev.style.display='';
+
+    function previewImageResult(blob) {
+      previewImg.src = URL.createObjectURL(blob);
+      previewImg.style.display = '';
     }
-    function previewLottie(data) {
-      lottPrev.innerHTML='';
+
+    function previewLottieResult(data) {
+      lottieContainer.innerHTML = '';
       lottie.loadAnimation({
-        container:lottPrev,renderer:'svg',loop:true,autoplay:true,animationData:data
+        container: lottieContainer,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        animationData: data
       });
     }
 
-    function once(el,event) {
-      return new Promise(r=>el.addEventListener(event,r,{once:true}));
+    function once(el, event) {
+      return new Promise(resolve => el.addEventListener(event, resolve, { once: true }));
     }
   </script>
 </body>
