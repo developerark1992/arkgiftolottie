@@ -45,10 +45,12 @@
       <input type="file" id="gifInput" accept="image/gif" />
       <input type="text" id="fileNameInput" placeholder="Base filename" value="animation" />
     </div>
+
     <div class="section">
       <label>Frames: <input type="number" id="frameCountInput" value="15" min="1" max="60" /></label>
       <label>Scale %: <input type="number" id="scaleInput" value="50" min="10" max="100" /></label>
       <button id="convertBtn" disabled>Convert to Lottie</button>
+      <button id="resetBtn">Reset All</button>
     </div>
 
     <div id="progressContainer">
@@ -58,7 +60,7 @@
 
     <div class="section">
       <h3>1. Original GIF</h3>
-      <img id="gifPreview"
+      <img class="profile-icon" id="gifPreview"
            src="https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif"
            alt="No GIF selected" />
     </div>
@@ -85,30 +87,47 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
-    const gifInput        = document.getElementById('gifInput');
-    const fileNameInput   = document.getElementById('fileNameInput');
-    const frameCountInput = document.getElementById('frameCountInput');
-    const scaleInput      = document.getElementById('scaleInput');
-    const convertBtn      = document.getElementById('convertBtn');
-    const progressWrap    = document.getElementById('progressContainer');
-    const progressBar     = document.getElementById('progressBar');
-    const statusText      = document.getElementById('status');
-    const videoPreview    = document.getElementById('videoPreview');
-    const downloadVideoBtn= document.getElementById('downloadVideoBtn');
-    const lottieContainer = document.getElementById('lottieContainer');
+    const gifInput          = document.getElementById('gifInput');
+    const fileNameInput     = document.getElementById('fileNameInput');
+    const frameCountInput   = document.getElementById('frameCountInput');
+    const scaleInput        = document.getElementById('scaleInput');
+    const convertBtn        = document.getElementById('convertBtn');
+    const resetBtn          = document.getElementById('resetBtn');
+    const progressWrap      = document.getElementById('progressContainer');
+    const progressBar       = document.getElementById('progressBar');
+    const statusText        = document.getElementById('status');
+    const videoPreview      = document.getElementById('videoPreview');
+    const downloadVideoBtn  = document.getElementById('downloadVideoBtn');
+    const lottieContainer   = document.getElementById('lottieContainer');
     const downloadLottieBtn = document.getElementById('downloadLottieBtn');
 
     let gifFrames = null, lottieData = null;
-    const fps = 30, videoMime = 'video/webm; codecs=vp8,opus', videoExt = '.webm';
+    const fps = 30, videoMime = 'video/webm; codecs=vp8,opus';
+
+    // Reset button handler
+    resetBtn.addEventListener('click', () => {
+      gifInput.value = '';
+      resetAll();
+    });
 
     gifInput.addEventListener('change', async () => {
       resetAll();
       const file = gifInput.files[0];
       if (!file) return;
+
       gifPreview.src = URL.createObjectURL(file);
-      const buf = await file.arrayBuffer();
-      const parsed = parseGIF(buf);
-      gifFrames = decompressFrames(parsed, true);
+
+      // Try to parse & decompress; catch memory errors
+      try {
+        const buf = await file.arrayBuffer();
+        const parsed = parseGIF(buf);
+        gifFrames = decompressFrames(parsed, true);
+      } catch (err) {
+        console.error('Failed to process GIF:', err);
+        alert('❌ Error processing GIF (too large/complex). Please try a smaller file.');
+        return;
+      }
+
       convertBtn.disabled = !gifFrames.length;
     });
 
@@ -128,8 +147,8 @@
       statusText.textContent = 'Building Lottie JSON…';
       lottieData = await buildLottieFromGif(
         gifFrames,
-        parseInt(frameCountInput.value),
-        parseFloat(scaleInput.value)/100,
+        parseInt(frameCountInput.value, 10),
+        parseFloat(scaleInput.value, 10) / 100,
         p => { progressBar.value = 50 + p * 50; }
       );
 
@@ -142,7 +161,7 @@
 
     downloadLottieBtn.addEventListener('click', () => {
       const base = fileNameInput.value.trim() || 'animation';
-      const blob = new Blob([JSON.stringify(lottieData,null,2)], { type:'application/json' });
+      const blob = new Blob([JSON.stringify(lottieData, null, 2)], { type:'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = base + '.json';
@@ -162,12 +181,12 @@
         rec.start();
         let i=0, delay=1000/fps;
         (function draw(){
-          if(i>=frames.length) return rec.stop();
+          if (i >= frames.length) return rec.stop();
           const f = frames[i++];
-          ctx.putImageData(new ImageData(
-            new Uint8ClampedArray(f.patch),
-            f.dims.width, f.dims.height
-          ),0,0);
+          ctx.putImageData(
+            new ImageData(new Uint8ClampedArray(f.patch), f.dims.width, f.dims.height),
+            0,0
+          );
           onProg(i/frames.length);
           setTimeout(draw, delay);
         })();
@@ -177,7 +196,7 @@
     async function buildLottieFromGif(frames, total, scale, onProg) {
       const origW = frames[0].dims.width, origH = frames[0].dims.height;
       const picks = Array.from({length:total}, (_,i)=>Math.floor(i*frames.length/total));
-      const W = Math.floor(origW*scale), H = Math.floor(origH*scale);
+      const W = Math.floor(origW * scale), H = Math.floor(origH * scale);
       const canvas = document.createElement('canvas');
       canvas.width = W; canvas.height = H;
       const ctx = canvas.getContext('2d');
@@ -221,8 +240,11 @@
     function previewLottie(data) {
       lottieContainer.innerHTML = '';
       lottie.loadAnimation({
-        container:lottieContainer, renderer:'svg',
-        loop:true, autoplay:true, animationData:data
+        container: lottieContainer,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        animationData: data
       });
     }
 
@@ -237,7 +259,8 @@
       progressWrap.style.display = 'none';
       progressBar.value = 0;
       statusText.textContent = '';
-      gifFrames = lottieData = null;
+      gifFrames = null;
+      lottieData = null;
     }
   </script>
 </body>
