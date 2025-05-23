@@ -59,7 +59,7 @@
     <div class="section">
       <h3>1. Original GIF</h3>
       <img id="gifPreview"
-           src="favicon.png"
+           src="https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif"
            alt="No GIF selected" />
     </div>
 
@@ -86,9 +86,8 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
-    const MAX_FILE_SIZE    = 50 * 1024 * 1024; // 50 MB
-    const fps              = 30;
-    const videoMime        = 'video/webm; codecs=vp8,opus';
+    const fps             = 30;
+    const videoMime       = 'video/webm; codecs=vp8,opus';
 
     const gifInput         = document.getElementById('gifInput');
     const gifPreview       = document.getElementById('gifPreview');
@@ -109,11 +108,6 @@
       resetPreviewState();
       const file = gifInput.files[0];
       if (!file) return;
-
-      if (file.size > MAX_FILE_SIZE) {
-        alert('That GIF is too large (>50 MB). Please pick one under 50 MB.');
-        return;
-      }
 
       gifPreview.src = URL.createObjectURL(file);
 
@@ -172,13 +166,13 @@
     resetBtn.addEventListener('click', resetAll);
 
     function resetPreviewState() {
-      lottieContainer.innerHTML = '';
-      progressWrap.style.display = 'none';
-      progressBar.value = 0;
-      statusText.textContent = '';
-      convertBtn.disabled       = true;
-      downloadLottieBtn.disabled= true;
-      resetBtn.disabled         = true;
+      lottieContainer.innerHTML    = '';
+      progressWrap.style.display   = 'none';
+      progressBar.value            = 0;
+      statusText.textContent       = '';
+      convertBtn.disabled          = true;
+      downloadLottieBtn.disabled   = true;
+      resetBtn.disabled            = true;
       gifFrames = null;
     }
 
@@ -217,20 +211,16 @@
     }
 
     async function buildLottieFromGif(frames, total, scale, onProg) {
-      const origW = frames[0].dims.width;
-      const origH = frames[0].dims.height;
+      const origW = frames[0].dims.width, origH = frames[0].dims.height;
       const picks = Array.from({ length: total }, (_, i) =>
         Math.floor(i * frames.length / total)
       );
-      const W = Math.floor(origW * scale);
-      const H = Math.floor(origH * scale);
+      const W = Math.floor(origW * scale), H = Math.floor(origH * scale);
       const canvas = document.createElement('canvas');
-      canvas.width  = W;
-      canvas.height = H;
+      canvas.width  = W; canvas.height = H;
       const ctx  = canvas.getContext('2d');
       const tmp  = document.createElement('canvas');
-      tmp.width  = origW;
-      tmp.height = origH;
+      tmp.width  = origW; tmp.height = origH;
       const tctx = tmp.getContext('2d');
 
       const images = picks.map((idx, i) => {
