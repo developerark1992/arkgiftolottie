@@ -5,12 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GIF → Video → Optimized Lottie</title>
 
-  <!-- Favicon (served from your GitHub via jsDelivr) -->
-  <link
-    rel="icon"
-    type="image/png"
-    href="https://cdn.jsdelivr.net/gh/developerark/profile-assets@main/favicon.png"
-  />
+  <!-- Favicon from repo root -->
+  <link rel="icon" type="image/png" href="favicon.png" />
 
   <style>
     body {
@@ -45,8 +41,7 @@
     h2, h3 { margin: 0 0 1rem; color: #fafafa; }
     .section { margin-bottom: 1.5rem; }
     input, button { font-size: 1rem; margin-right: 0.5rem; }
-    input[type="text"],
-    input[type="number"] {
+    input[type="text"], input[type="number"] {
       padding: 0.4rem;
       border-radius: 4px;
       border: 1px solid #555;
@@ -85,31 +80,27 @@
 <body>
 
   <div class="card">
-    <!-- Header with your profile icon -->
     <div class="header">
-      <img
-        class="profile-icon"
-        src="https://cdn.jsdelivr.net/gh/developerark/profile-assets@main/favicon.png"
-        alt="Abdul Rehman Khan"
-      />
+      <!-- Profile Icon from repo root -->
+      <img src="favicon.png" alt="Abdul Rehman Khan" class="profile-icon" />
       <h2>GIF → Video → Optimized Lottie</h2>
     </div>
 
-    <!-- File inputs & options -->
     <div class="section">
       <input type="file" id="gifInput" accept="image/gif" />
       <input type="text" id="fileNameInput" placeholder="Base filename" value="animation" />
     </div>
+
     <div class="section">
       <label>Frames: <input type="number" id="frameCountInput" value="15" min="1" max="60" /></label>
       <label>Scale %: <input type="number" id="scaleInput" value="50" min="10" max="100" /></label>
     </div>
+
     <div class="section">
       <button id="toVideoBtn" disabled>Convert to Video</button>
       <button id="toLottieBtn" disabled>Convert to Lottie</button>
     </div>
 
-    <!-- Previews & download buttons -->
     <div class="section">
       <h3>1. Original GIF</h3>
       <img
@@ -118,18 +109,19 @@
         alt="No GIF selected"
       />
     </div>
+
     <div class="section">
       <h3>2. Transparent WebM Video</h3>
       <video id="videoPreview" controls></video>
       <button id="downloadVideoBtn" disabled>Download Video</button>
     </div>
+
     <div class="section">
       <h3>3. Optimized Lottie Animation</h3>
       <div id="lottieContainer"></div>
       <button id="downloadLottieBtn" disabled>Download Lottie JSON</button>
     </div>
 
-    <!-- Footer with your name & LinkedIn -->
     <div class="footer">
       Created by Abdul Rehman Khan —  
       <a href="https://www.linkedin.com/in/developerark/" target="_blank">
@@ -155,10 +147,9 @@
     const lottieContainer   = document.getElementById('lottieContainer');
 
     let gifFrames = null, videoBlob = null, lottieData = null;
-    const videoMime = 'video/webm; codecs=vp8,opus';
-    const videoExt  = '.webm';
+    const videoMime = 'video/webm; codecs=vp8,opus', videoExt = '.webm';
 
-    // 1) Extract GIF frames
+    // 1) Extract frames from GIF
     gifInput.addEventListener('change', async () => {
       resetAll();
       const file = gifInput.files[0];
@@ -175,7 +166,7 @@
       }
     });
 
-    // 2) GIF → Transparent WebM
+    // 2) Convert to transparent WebM
     toVideoBtn.addEventListener('click', () => {
       if (!gifFrames) return;
       toVideoBtn.disabled = true;
@@ -214,7 +205,7 @@
       })();
     }
 
-    // Download the WebM
+    // Download WebM
     downloadVideoBtn.addEventListener('click', () => {
       if (!videoBlob) return;
       const base = (fileNameInput.value||'animation').trim();
@@ -297,7 +288,7 @@
       a.click();
     });
 
-    // Reset function
+    // Reset everything
     function resetAll(){
       gifPreview.src            = 'https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif';
       videoPreview.src          = '';
