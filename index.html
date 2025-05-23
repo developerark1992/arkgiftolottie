@@ -1,45 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Separate Converters</title>
-  <link rel="icon" href="favicon.png" type="image/png"/>
+  <link rel="icon" href="favicon.png" type="image/png" />
   <style>
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    body { background:#121212; color:#eee; font-family:sans-serif;
-           display:flex;justify-content:center;padding:2rem;margin:0 }
-    .card { background:#1e1e1e;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.5);
-            width:90%;max-width:700px;padding:2rem }
-    h2,h3 { color:#fafafa; margin:0 0 1rem }
-    .section { margin-bottom:1.5rem }
-    input, button { font-size:1rem; margin:0 .5rem .5rem 0 }
-    input[type="text"]{padding:.4rem;border-radius:4px;border:1px solid #555;
-                       background:#2b2b2b;color:#fff;width:200px}
-    button { background:#2196f3;border:none;border-radius:6px;color:#fff;
-             padding:.6rem 1.2rem;cursor:pointer;transition:background .2s }
-    button:disabled { background:#555;cursor:not-allowed }
-    button:hover:not(:disabled){background:#1976d2}
-    #progressContainer{display:none;margin:1rem 0;text-align:center}
-    #spinner{display:none;width:32px;height:32px;margin:0 auto;animation:spin 1s linear infinite}
-    #status{text-align:center;margin-top:.5rem;font-size:.9rem}
-    #previewBox{border:1px solid #333;border-radius:6px;
-                background:transparent;min-height:200px;padding:0;overflow:auto}
-    #previewBox > * { width:100%; display:block }
-    #previewBox > div { height:300px } /* for Lottie */
-    #downloadBtn, #resetBtn { display:block; margin-top:1rem }
-    .footer{text-align:center;margin-top:2rem;font-size:.9rem;color:#888}
-    .footer a{color:#2196f3;text-decoration:none}
+    body { background: #121212; color: #eee; font-family: sans-serif;
+           display: flex; justify-content: center; padding: 2rem; margin: 0; }
+    .card { background: #1e1e1e; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            width: 90%; max-width: 700px; padding: 2rem; }
+    h2, h3 { color: #fafafa; margin: 0 0 1rem; }
+    .section { margin-bottom: 1.5rem; }
+    input, button { font-size: 1rem; margin: 0 .5rem .5rem 0; }
+    input[type="text"] { padding: .4rem; border-radius: 4px; border: 1px solid #555;
+                          background: #2b2b2b; color: #fff; width: 200px; }
+    button { background: #2196f3; border: none; border-radius: 6px; color: #fff;
+             padding: .6rem 1.2rem; cursor: pointer; transition: background .2s; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #1976d2; }
+    #progressContainer { display: none; text-align: center; margin: 1rem 0; }
+    #spinner { display: none; width: 32px; height: 32px; animation: spin 1s linear infinite; }
+    #status { margin-top: .5rem; font-size: .9rem; }
+    #previewBox { border: 1px solid #333; border-radius: 6px;
+                  background: transparent; min-height: 200px; padding: 0; overflow: auto; }
+    #previewBox > * { width: 100%; display: block; }
+    #previewBox > div { height: 300px; }
+    #downloadBtn, #resetBtn { display: block; margin-top: 1rem; }
+    .footer { text-align: center; margin-top: 2rem; font-size: .9rem; color: #888; }
+    .footer a { color: #2196f3; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h2>Separate Converters</h2>
+    <h2>ARK Converter</h2>
 
     <div class="section">
       <input id="fileInput" type="file"
-             accept="image/gif,video/mp4,video/webm,application/json"/>
-      <input id="fileName" type="text" placeholder="Base filename" value="output"/>
+             accept="image/gif,video/mp4,video/webm,application/json" />
+      <input id="fileName" type="text" placeholder="Base filename" value="output" />
     </div>
 
     <div class="section" id="gifActions" style="display:none">
@@ -63,7 +63,7 @@
 
     <div id="progressContainer">
       <img id="spinner" src="favicon.png" alt="Loading..." />
-      <div id="status">Waiting…</div>
+      <div id="status"></div>
     </div>
 
     <h3>Preview</h3>
@@ -82,14 +82,14 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
-    const fileInput   = document.getElementById('fileInput');
-    const fileNameIn  = document.getElementById('fileName');
-    const progressWrap= document.getElementById('progressContainer');
-    const spinner     = document.getElementById('spinner');
-    const statusText  = document.getElementById('status');
-    const previewBox  = document.getElementById('previewBox');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const resetBtn    = document.getElementById('resetBtn');
+    const fileInput    = document.getElementById('fileInput');
+    const fileNameIn   = document.getElementById('fileName');
+    const progressWrap = document.getElementById('progressContainer');
+    const spinner      = document.getElementById('spinner');
+    const statusText   = document.getElementById('status');
+    const previewBox   = document.getElementById('previewBox');
+    const downloadBtn  = document.getElementById('downloadBtn');
+    const resetBtn     = document.getElementById('resetBtn');
 
     const gifActions    = document.getElementById('gifActions');
     const mp4Actions    = document.getElementById('mp4Actions');
@@ -100,6 +100,7 @@
     const fps      = 30;
     const webmMime = 'video/webm; codecs=vp8,opus';
     const mp4Mime  = 'video/mp4; codecs="avc1.42E01E,mp4a.40.2"';
+    const maxFrames= 30; // max frames for lottie to limit memory
 
     function showProgress(msg){
       progressWrap.style.display = '';
@@ -120,140 +121,156 @@
     }
     function once(el,ev){ return new Promise(r=>el.addEventListener(ev,r,{once:true})); }
 
-    async function recordStream(video,mime,onProg){
+    async function recordStream(video, mime, onProg){
       return new Promise(res=>{
-        const rec=new MediaRecorder(video.captureStream(),{mimeType:mime});
-        const chunks=[];
-        rec.ondataavailable=e=>chunks.push(e.data);
-        rec.onstop=()=>res(new Blob(chunks,{type:mime}));
+        const rec = new MediaRecorder(video.captureStream(), {mimeType: mime});
+        const chunks = [];
+        rec.ondataavailable = e=>chunks.push(e.data);
+        rec.onstop = ()=>res(new Blob(chunks,{type:mime}));
         video.play(); rec.start();
-        video.addEventListener('timeupdate',()=> onProg(video.currentTime/video.duration));
-        video.addEventListener('ended',()=> rec.stop());
+        video.addEventListener('timeupdate', ()=> onProg(video.currentTime/video.duration));
+        video.addEventListener('ended', ()=> rec.stop());
       });
     }
 
-    async function recordFrames(frames,onProg){
-      return record(frames, webmMime, onProg); // reuse record helper from below
-    }
+    async function buildLottie(frames, total, scale, onProg){
+      const picks = Array.from({length: total}, (_,i) =>
+        frames[Math.floor(i*frames.length/total)]
+      );
+      const ow = picks[0].dims.width, oh = picks[0].dims.height;
+      const W = Math.floor(ow*scale), H = Math.floor(oh*scale);
+      const c = document.createElement('canvas'); c.width=W; c.height=H;
+      const ctx = c.getContext('2d',{willReadFrequently:true});
+      const tmp = document.createElement('canvas'); tmp.width=ow; tmp.height=oh;
+      const tctx = tmp.getContext('2d',{willReadFrequently:true});
 
-    async function record(frames,mime,onProg){
-      return new Promise(res=>{
-        const c=document.createElement('canvas');
-        c.width=frames[0].dims.width; c.height=frames[0].dims.height;
-        const ctx=c.getContext('2d',{willReadFrequently:true});
-        const rec=new MediaRecorder(c.captureStream(fps),{mimeType:mime});
-        const chunks=[];
-        rec.ondataavailable=e=>chunks.push(e.data);
-        rec.onstop=()=>res(new Blob(chunks,{type:mime}));
-        rec.start();
-        frames.forEach((f,i)=>{
-          setTimeout(()=>{
-            ctx.putImageData(new ImageData(f.patch,f.dims.width,f.dims.height),0,0);
-            onProg(i/frames.length);
-            if(i===frames.length-1) rec.stop();
-          },i*(1000/fps));
-        });
-      });
-    }
-
-    function showPreview(blob,ext){
-      previewBox.innerHTML = '';
-      if(ext==='.json'){
-        const cont= document.createElement('div'); previewBox.appendChild(cont);
-        lottie.loadAnimation({container:cont,renderer:'svg',loop:true,autoplay:true,animationData:lottieData});
-      } else if(ext==='.gif'){
-        const img=document.createElement('img'); img.src=URL.createObjectURL(blob); previewBox.appendChild(img);
-      } else {
-        const vid=document.createElement('video'); vid.controls=true; vid.src=URL.createObjectURL(blob); previewBox.appendChild(vid);
+      let imgs = [];
+      for(let i=0; i<total; i++){
+        const f = picks[i];
+        tctx.putImageData(new ImageData(f.patch, ow, oh), 0, 0);
+        ctx.clearRect(0,0,W,H);
+        ctx.drawImage(tmp,0,0,ow,oh,0,0,W,H);
+        onProg(i/total);
+        imgs.push(c.toDataURL('image/png'));
       }
+      const assets = imgs.map((d,i)=>({id:`img_${i}`,p:d,w:W,h:H,e:1}));
+      const layers = imgs.map((_,i)=>({
+        ddd:0, ind:i+1, ty:2, refId:`img_${i}`,
+        ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[W/2,H/2,0]},a:{a:0,k:[W/2,H/2,0]},s:{a:0,k:[100,100,100]}},
+        ip:i, op:i+1, st:0, bm:0
+      }));
+      return {v:"5.7.4",fr:fps,ip:0,op:imgs.length,w:W,h:H,nm:"Lottie",ddd:0,assets,layers};
     }
 
-    fileInput.onchange=async()=>{
+    fileInput.onchange = async()=>{
       resetAll(); const f=fileInput.files[0]; if(!f) return;
-      mode=f.type.includes('gif')?'gif':f.type.includes('mp4')?'mp4':f.type.includes('webm')?'webm':/\.json$/.test(f.name)?'lottie':null;
-      if(mode==='gif') gifActions.style.display='';
-      if(mode==='mp4') mp4Actions.style.display='';
-      if(mode==='webm') webmActions.style.display='';
-      if(mode==='lottie') lottieActions.style.display='';
-      if(mode==='gif') arrayBuffer=await f.arrayBuffer();
+      mode = f.type.includes('gif')?'gif': f.type.includes('mp4')?'mp4': f.type.includes('webm')?'webm': /\.json$/.test(f.name)?'lottie':null;
+      if(mode==='gif')    gifActions.style.display    = '';
+      if(mode==='mp4')    mp4Actions.style.display    = '';
+      if(mode==='webm')   webmActions.style.display   = '';
+      if(mode==='lottie') lottieActions.style.display = '';
+      if(mode==='gif')    arrayBuffer = await f.arrayBuffer();
 
-      previewBox.innerHTML='';
+      // immediate preview
+      previewBox.innerHTML = '';
       if(/gif|mp4|webm/.test(mode)){
-        const m=mode==='gif'?document.createElement('img'):document.createElement('video');
-        m.controls=true; m.src=URL.createObjectURL(f); previewBox.appendChild(m);
+        const m = mode==='gif'?document.createElement('img'):document.createElement('video');
+        m.controls = true; m.src=URL.createObjectURL(f); previewBox.appendChild(m);
       } else if(mode==='lottie'){
-        const buf=await f.arrayBuffer(); lottieData=JSON.parse(new TextDecoder().decode(buf));
+        const buf=await f.arrayBuffer();
+        lottieData=JSON.parse(new TextDecoder().decode(buf));
         const cont=document.createElement('div'); previewBox.appendChild(cont);
         lottie.loadAnimation({container:cont,renderer:'svg',loop:true,autoplay:true,animationData:lottieData});
       }
     };
 
-    document.getElementById('gif2lottie').onclick=()=>runGifTo('lottie');
-    document.getElementById('gif2webm').onclick=()=>runGifTo('webm');
-    document.getElementById('gif2mp4').onclick=()=>runGifTo('mp4');
+    // GIF → X
+    document.getElementById('gif2lottie').onclick = ()=>runGifTo('lottie');
+    document.getElementById('gif2webm').onclick   = ()=>runGifTo('webm');
+    document.getElementById('gif2mp4').onclick    = ()=>runGifTo('mp4');
     async function runGifTo(target){
       showProgress('Parsing GIF…');
-      const frames=decompressFrames(parseGIF(arrayBuffer),true);
+      let frames = decompressFrames(parseGIF(arrayBuffer), true);
+      if(frames.length>maxFrames) frames = frames.filter((_,i)=>i % Math.ceil(frames.length/maxFrames)===0);
       if(target!=='lottie'){
         showProgress(`Recording → ${target.toUpperCase()}…`);
-        outputBlob=await record(frames,(target==='webm'?webmMime:mp4Mime),(p)=>showProgress(`Recording… ${Math.round(p*100)}%`));
-        outputExt='.'+target;
+        const mime = target==='webm'? webmMime: mp4Mime;
+        // draw frames to video canvas
+        const canvas = document.createElement('canvas');
+        canvas.width=frames[0].dims.width; canvas.height=frames[0].dims.height;
+        const ctx=canvas.getContext('2d',{willReadFrequently:true});
+        const videoBlob = await new Promise(res=>{
+          const rec=new MediaRecorder(canvas.captureStream(fps),{mimeType:mime});
+          const chunks=[];
+          rec.ondataavailable=e=>chunks.push(e.data);
+          rec.onstop=()=>res(new Blob(chunks,{type:mime}));
+          rec.start();
+          frames.forEach((f,i)=>setTimeout(()=>{
+            ctx.putImageData(new ImageData(f.patch,f.dims.width,f.dims.height),0,0);
+          }, i*(1000/fps)));
+          setTimeout(()=>rec.stop(), frames.length*(1000/fps)+100);
+        });
+        outputBlob=videoBlob; outputExt='.'+target;
       } else {
         showProgress('Building Lottie…');
-        lottieData=await buildLottie(frames,60,0.5,(p)=>showProgress(`Building… ${Math.round(p*100)}%`));
+        lottieData = await buildLottie(frames, maxFrames, 0.5, p=>showProgress(`Building… ${Math.round(p*100)}%`));
         outputBlob=new Blob([JSON.stringify(lottieData)],{type:'application/json'});
         outputExt='.json';
       }
       hideProgress(); showPreview(outputBlob,outputExt); downloadBtn.disabled=false;
     }
 
-    document.getElementById('mp42webm').onclick=()=>runVideoTo('webm');
-    document.getElementById('mp42lottie').onclick=()=>runVideoTo('lottie');
-    document.getElementById('webm2mp4').onclick=()=>runVideoTo('mp4');
-    document.getElementById('webm2lottie').onclick=()=>runVideoTo('lottie');
+    // Video → X
+    document.getElementById('mp42webm').onclick    = ()=>runVideoTo('webm');
+    document.getElementById('mp42lottie').onclick  = ()=>runVideoTo('lottie');
+    document.getElementById('webm2mp4').onclick    = ()=>runVideoTo('mp4');
+    document.getElementById('webm2lottie').onclick = ()=>runVideoTo('lottie');
     async function runVideoTo(target){
       showProgress('Loading video…');
-      const f=fileInput.files[0];
-      const vid=document.createElement('video'); vid.src=URL.createObjectURL(f);
-      vid.muted=true; vid.playsInline=true; vid.preload='auto'; vid.load();
+      const f=fileInput.files[0]; const vid=document.createElement('video');
+      vid.src=URL.createObjectURL(f); vid.preload='auto'; vid.muted=true; vid.playsInline=true;
       await once(vid,'loadeddata');
 
-      if(target!=='lottie'){
-        showProgress(`Recording → ${target.toUpperCase()}…`);
-        const mime= target==='webm'? webmMime : mp4Mime;
-        outputBlob=await recordStream(vid,mime,(p)=>showProgress(`Recording… ${Math.round(p*100)}%`));
-        outputExt='.'+target;
-      } else {
-        showProgress('Building frames…');
-        const frames=[];
-        const total= Math.min(60, Math.floor(vid.duration*fps));
-        const c=document.createElement('canvas'); c.width=vid.videoWidth*0.5; c.height=vid.videoHeight*0.5;
-        const ctx=c.getContext('2d',{willReadFrequently:true});
+      if(target==='lottie'){
+        showProgress('Capturing frames…');
+        const total = Math.min(maxFrames, Math.floor(vid.duration*fps));
+        const canvas=document.createElement('canvas');
+        canvas.width=vid.videoWidth*0.5; canvas.height=vid.videoHeight*0.5;
+        const ctx=canvas.getContext('2d',{willReadFrequently:true});
+        let frames=[];
         for(let i=0;i<total;i++){
           vid.currentTime=i/fps; await once(vid,'seeked');
-          ctx.drawImage(vid,0,0,vid.videoWidth,vid.videoHeight,0,0,c.width,c.height);
-          frames.push({patch:ctx.getImageData(0,0,c.width,c.height).data,dims:{width:c.width,height:c.height}});
+          ctx.drawImage(vid,0,0,vid.videoWidth,vid.videoHeight,0,0,canvas.width,canvas.height);
+          const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+          frames.push({patch:data,dims:{width:canvas.width,height:canvas.height}});
           showProgress(`Capturing… ${Math.round((i+1)/total*100)}%`);
         }
         showProgress('Building Lottie…');
-        lottieData=await buildLottie(frames,30,0.5,(p)=>showProgress(`Building… ${Math.round(p*100)}%`));
+        lottieData=await buildLottie(frames,total,1, p=>showProgress(`Building… ${Math.round(p*100)}%`));
         outputBlob=new Blob([JSON.stringify(lottieData)],{type:'application/json'});
         outputExt='.json';
+      } else {
+        showProgress(`Recording → ${target.toUpperCase()}…`);
+        const mime= target==='webm'? webmMime: mp4Mime;
+        outputBlob=await recordStream(vid,mime, p=>showProgress(`Recording… ${Math.round(p*100)}%`));
+        outputExt='.'+target;
       }
       hideProgress(); showPreview(outputBlob,outputExt); downloadBtn.disabled=false;
     }
 
-    document.getElementById('lottie2webm').onclick=()=>runLottieTo('webm');
-    document.getElementById('lottie2mp4').onclick=()=>runLottieTo('mp4');
-    document.getElementById('lottie2gif').onclick=()=>runLottieTo('gif');
+    // Lottie → X
+    document.getElementById('lottie2webm').onclick = ()=>runLottieTo('webm');
+    document.getElementById('lottie2mp4').onclick  = ()=>runLottieTo('mp4');
+    document.getElementById('lottie2gif').onclick  = ()=>runLottieTo('gif');
     async function runLottieTo(target){
       showProgress('Loading Lottie…');
       const buf=await fileInput.files[0].arrayBuffer();
       const json=JSON.parse(new TextDecoder().decode(buf));
       const anim=lottie.loadAnimation({container:document.createElement('div'),renderer:'canvas',loop:false,autoplay:false,animationData:json});
       await once(anim,'DOMLoaded');
-      const c=anim.renderer.canvas,ctx=c.getContext('2d',{willReadFrequently:true});
-      const total= Math.min(60,Math.floor(anim.getDuration(true)*fps)), frames=[];
+      const c=anim.renderer.canvas, ctx=c.getContext('2d',{willReadFrequently:true});
+      const total=Math.min(maxFrames,Math.floor(anim.getDuration(true)*fps));
+      let frames=[];
       for(let i=0;i<total;i++){
         anim.goToAndStop(i*(1000/fps),true);
         frames.push({patch:ctx.getImageData(0,0,c.width,c.height).data,dims:{width:c.width,height:c.height}});
@@ -262,30 +279,17 @@
       anim.destroy();
       if(target==='gif'){
         showProgress('Recording → WEBM (GIF)…');
-        outputBlob=await record(frames,webmMime,(p)=>showProgress(`Recording… ${Math.round(p*100)}%`)); outputExt='.gif';
+        outputBlob=await record(frames,webmMime,p=>showProgress(`Recording… ${Math.round(p*100)}%`)); outputExt='.gif';
       } else {
         showProgress(`Recording → ${target.toUpperCase()}…`);
-        const mime= target==='webm'? webmMime : mp4Mime;
-        outputBlob=await record(frames,mime,(p)=>showProgress(`Recording… ${Math.round(p*100)}%`)); outputExt='.'+target;
+        const mime= target==='webm'? webmMime: mp4Mime;
+        outputBlob=await record(frames,mime,p=>showProgress(`Recording… ${Math.round(p*100)}%`)); outputExt='.'+target;
       }
       hideProgress(); showPreview(outputBlob,outputExt); downloadBtn.disabled=false;
     }
 
     downloadBtn.onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(outputBlob); a.download=(fileNameIn.value.trim()||'output')+outputExt; a.click(); };
     resetBtn.onclick=resetAll;
-
-    async function buildLottie(frames,total,scale,onProg){
-      const picks=Array.from({length:total},(_,i)=>Math.floor(i*frames.length/total));
-      const ow=frames[0].dims.width, oh=frames[0].dims.height;
-      const W=Math.floor(ow*scale), H=Math.floor(oh*scale);
-      const c=document.createElement('canvas'); c.width=W; c.height=H;
-      const ctx=c.getContext('2d',{willReadFrequently:true}),tmp=document.createElement('canvas');
-      tmp.width=ow; tmp.height=oh; const tctx=tmp.getContext('2d',{willReadFrequently:true});
-      const imgs=picks.map((idx,i)=>{ const f=frames[idx]; tctx.putImageData(new ImageData(f.patch,ow,oh),0,0); ctx.clearRect(0,0,W,H); ctx.drawImage(tmp,0,0,ow,oh,0,0,W,H); onProg(i/total); return c.toDataURL('image/png'); });
-      const assets=imgs.map((d,i)=>({id:`img_${i}`,p:d,w:W,h:H,e:1}));
-      const layers=imgs.map((_,i)=>({ddd:0,ind:i+1,ty:2,refId:`img_${i}`,ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[W/2,H/2,0]},a:{a:0,k:[W/2,H/2,0]},s:{a:0,k:[100,100,100]}},ip:i,op:i+1,st:0,bm:0}));
-      return {v:"5.7.4",fr:fps,ip:0,op:imgs.length,w:W,h:H,nm:"Lottie",ddd:0,assets,layers};
-    }
   </script>
 </body>
 </html>
