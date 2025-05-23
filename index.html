@@ -70,6 +70,7 @@
       <button id="dlMP4" disabled>Download MP4</button>
       <button id="dlGIF" disabled>Download GIF</button>
       <button id="dlLottie" disabled>Download Lottie</button>
+      <button id="resetBtn">Reset</button>
     </div>
 
     <div class="footer">
@@ -82,7 +83,6 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
-    // Get DOM elements
     const fileInput         = document.getElementById('fileInput');
     const fileNameIn        = document.getElementById('fileName');
     const btnWebM           = document.getElementById('toWebM');
@@ -99,12 +99,14 @@
     const dlMP4             = document.getElementById('dlMP4');
     const dlGIF             = document.getElementById('dlGIF');
     const dlLottie          = document.getElementById('dlLottie');
+    const resetBtn          = document.getElementById('resetBtn');
     const downloadsDiv      = document.querySelector('.downloads');
 
     let mode, arrayBuffer, gifFrames, blobs = {}, lottieData;
     const fps = 30;
 
-    // Define resetAll before it's used
+    resetBtn.addEventListener('click', resetAll);
+
     function resetAll() {
       blobs = {};
       gifFrames = null;
@@ -119,14 +121,13 @@
       progressContainer.style.display = 'none';
       progressBar.value = 0;
       statusText.textContent = '';
-      // hide & disable all conversion buttons
       [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => {
         b.style.display = 'inline-block';
         b.disabled = true;
       });
+      fileInput.value = '';
     }
 
-    // Wire up file input
     fileInput.addEventListener('change', async () => {
       resetAll();
       const f = fileInput.files[0];
@@ -136,24 +137,20 @@
            : f.type.includes('webm') ? 'webm'
            : null;
 
-      // Show & enable buttons, then hide the one matching mode
       [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => b.style.display = 'inline-block');
       if (mode === 'gif')  btnGIF.style.display = 'none';
       if (mode === 'mp4')  btnMP4.style.display = 'none';
       if (mode === 'webm') btnWebM.style.display = 'none';
 
       [btnWebM, btnMP4, btnGIF, btnLottie].forEach(b => b.disabled = false);
-
       if (mode === 'gif') arrayBuffer = await f.arrayBuffer();
     });
 
-    // Button handlers
     btnWebM.onclick   = () => runConversion('webm');
     btnMP4.onclick    = () => runConversion('mp4');
     btnGIF.onclick    = () => runConversion('gif');
     btnLottie.onclick = () => runConversion('lottie');
 
-    // Download handlers
     dlWebM.onclick    = () => downloadBlob('webm', '.webm');
     dlMP4.onclick     = () => downloadBlob('mp4', '.mp4');
     dlGIF.onclick     = () => downloadBlob('gif', '.gif');
@@ -198,8 +195,16 @@
           break;
 
         case 'lottie':
-          const frames = (mode === 'gif' ? getGifFrames() : await getVideoFrames(fileInput.files[0]));
-          lottieData = await buildLottie(frames, 60, 0.5, p => progressBar.value = p * 100);
+          showProgress('Building Lottie JSON…', 0);
+          const framesArr = mode === 'gif'
+            ? await getGifFrames()
+            : await getVideoFrames(fileInput.files[0]);
+          lottieData = await buildLottie(
+            framesArr,
+            60,
+            0.5,
+            p => { progressBar.value = p * 100; }
+          );
           previewLottieResult(lottieData);
           dlLottie.disabled = false;
           break;
@@ -268,9 +273,7 @@
     }
 
     function getGifFrames() {
-      if (!gifFrames) {
-        gifFrames = decompressFrames(parseGIF(arrayBuffer), true);
-      }
+      if (!gifFrames) gifFrames = decompressFrames(parseGIF(arrayBuffer), true);
       return Promise.resolve(gifFrames);
     }
 
@@ -310,12 +313,10 @@
       previewVideo.src = URL.createObjectURL(blob);
       previewVideo.style.display = '';
     }
-
     function previewImageResult(blob) {
       previewImg.src = URL.createObjectURL(blob);
       previewImg.style.display = '';
     }
-
     function previewLottieResult(data) {
       lottieContainer.innerHTML = '';
       lottie.loadAnimation({
