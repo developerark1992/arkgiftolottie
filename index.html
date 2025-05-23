@@ -3,105 +3,43 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GIF → One-Click Lottie</title>
-
-  <!-- Favicon from repo root -->
+  <title>GIF → One-Click Lottie with Progress</title>
   <link rel="icon" type="image/png" href="favicon.png" />
 
   <style>
-    body {
-      background: #121212;
-      color: #e0e0e0;
-      display: flex;
-      justify-content: center;
-      padding-top: 2rem;
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
+    body { background:#121212; color:#e0e0e0; font-family:'Segoe UI',sans-serif;
+           display:flex;justify-content:center;padding:2rem;margin:0; }
+    .card { background:#1e1e1e; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5);
+            padding:2rem; width:90%; max-width:700px; }
+    .header { display:flex; align-items:center; margin-bottom:1rem; }
+    .profile-icon { width:48px; height:48px; border-radius:50%; margin-right:.75rem;
+                    border:2px solid #2196f3; }
+    h2,h3 { margin:0 0 1rem; color:#fafafa; }
+    .section { margin-bottom:1.5rem; }
+    input, button { font-size:1rem; margin-right:.5rem; }
+    input[type="text"], input[type="number"] {
+      padding:.4rem; border-radius:4px; border:1px solid #555;
+      background:#2b2b2b; color:#fff;
     }
-    .card {
-      background: #1e1e1e;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      padding: 2rem;
-      width: 90%;
-      max-width: 700px;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    .profile-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      margin-right: 0.75rem;
-      border: 2px solid #2196f3;
-    }
-    h2, h3 {
-      margin: 0 0 1rem;
-      color: #fafafa;
-    }
-    .section {
-      margin-bottom: 1.5rem;
-    }
-    input, button {
-      font-size: 1rem;
-      margin-right: 0.5rem;
-    }
-    input[type="text"],
-    input[type="number"] {
-      padding: 0.4rem;
-      border-radius: 4px;
-      border: 1px solid #555;
-      background: #2b2b2b;
-      color: #fff;
-    }
-    button {
-      background: #2196f3;
-      border: none;
-      border-radius: 6px;
-      color: #fff;
-      cursor: pointer;
-      padding: 0.6rem 1.2rem;
-      transition: background 0.2s;
-    }
-    button:disabled {
-      background: #555;
-      cursor: not-allowed;
-    }
-    button:hover:not(:disabled) {
-      background: #1976d2;
-    }
-    img, #lottieContainer {
-      display: block;
-      margin: 0.5rem 0;
-      width: 100%;
-      border: 1px solid #333;
-      border-radius: 6px;
-      background: transparent;
-    }
-    #lottieContainer {
-      height: 300px;
-      background: #000;
-    }
-    .footer {
-      margin-top: 2rem;
-      font-size: 0.9rem;
-      text-align: center;
-      color: #888;
-    }
-    .footer a {
-      color: #2196f3;
-      text-decoration: none;
-    }
+    button { background:#2196f3; border:none; border-radius:6px; color:#fff;
+             cursor:pointer; padding:.6rem 1.2rem; transition:background .2s; }
+    button:disabled { background:#555; cursor:not-allowed; }
+    button:hover:not(:disabled) { background:#1976d2; }
+
+    #progressContainer { display:none; margin:1rem 0; }
+    #progressBar { width:100%; height:1rem; }
+    #status { margin-top:.5rem; text-align:center; font-size:.9rem; }
+
+    #lottieContainer { height:300px; background:#000; border:1px solid #333;
+                       border-radius:6px; margin:.5rem 0; }
+    .footer { margin-top:2rem; text-align:center; font-size:.9rem; color:#888; }
+    .footer a { color:#2196f3; text-decoration:none; }
   </style>
 </head>
 <body>
-
   <div class="card">
     <div class="header">
-      <img src="favicon.png" alt="Abdul Rehman Khan" class="profile-icon" />
+      <img src="favicon.png" alt="Profile" class="profile-icon"/>
       <h2>GIF → One-Click Lottie</h2>
     </div>
 
@@ -111,6 +49,11 @@
       <button id="convertBtn" disabled>Convert to Lottie</button>
     </div>
 
+    <div id="progressContainer">
+      <progress id="progressBar" max="100" value="0"></progress>
+      <div id="status">Waiting…</div>
+    </div>
+
     <div class="section">
       <h3>Preview</h3>
       <div id="lottieContainer"></div>
@@ -118,7 +61,7 @@
     </div>
 
     <div class="footer">
-      Created by Abdul Rehman Khan —  
+      Created by Abdul Rehman Khan —
       <a href="https://www.linkedin.com/in/developerark/" target="_blank">
         LinkedIn Profile
       </a>
@@ -129,18 +72,19 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
-    const gifInput    = document.getElementById('gifInput');
-    const fileNameIn  = document.getElementById('fileName');
-    const convertBtn  = document.getElementById('convertBtn');
-    const lottieCont  = document.getElementById('lottieContainer');
-    const downloadBtn = document.getElementById('downloadJSON');
+    const gifInput      = document.getElementById('gifInput');
+    const fileNameIn    = document.getElementById('fileName');
+    const convertBtn    = document.getElementById('convertBtn');
+    const progressWrap  = document.getElementById('progressContainer');
+    const progressBar   = document.getElementById('progressBar');
+    const statusText    = document.getElementById('status');
+    const lottieCont    = document.getElementById('lottieContainer');
+    const downloadBtn   = document.getElementById('downloadJSON');
 
-    let gifFrames = [];
-    let lottieData = null;
-    const videoMime = 'video/webm; codecs=vp8,opus';
-    const fps = 30;
+    let gifFrames = [], lottieData = null;
+    const fps = 30, videoMime = 'video/webm; codecs=vp8,opus';
 
-    // Enable button once GIF is loaded & frames extracted
+    // Enable convert when GIF loaded
     gifInput.addEventListener('change', async () => {
       const file = gifInput.files[0];
       if (!file) return convertBtn.disabled = true;
@@ -153,44 +97,45 @@
     convertBtn.addEventListener('click', async () => {
       convertBtn.disabled = true;
       downloadBtn.disabled = true;
+      progressBar.value = 0;
+      statusText.textContent = 'Recording WebM…';
+      progressWrap.style.display = 'block';
 
-      // 1) Record in-memory transparent WebM
-      const webmBlob = await recordWebM(gifFrames, fps);
-
-      // 2) Build Lottie JSON from that WebM
-      lottieData = await webmToLottie(webmBlob, fps);
-
-      // 3) Preview & enable download
-      lottieCont.innerHTML = '';
-      lottie.loadAnimation({
-        container:    lottieCont,
-        renderer:     'svg',
-        loop:         true,
-        autoplay:     true,
-        animationData: lottieData
+      // 1) WebM
+      const webmBlob = await recordWebM(gifFrames, fps, pct => {
+        progressBar.value = pct * 0.5; // 0–50%
       });
+
+      statusText.textContent = 'Building Lottie JSON…';
+      // 2) Lottie JSON
+      lottieData = await webmToLottie(webmBlob, fps, pct => {
+        progressBar.value = 50 + pct * 0.5; // 50–100%
+      });
+
+      // Done
+      progressBar.value = 100;
+      statusText.textContent = 'Complete!';
+      previewLottie(lottieData);
       downloadBtn.disabled = false;
     });
 
     downloadBtn.addEventListener('click', () => {
       if (!lottieData) return;
-      const base = (fileNameIn.value || 'animation').trim();
-      const blob = new Blob([JSON.stringify(lottieData, null, 2)], { type: 'application/json' });
+      const base = (fileNameIn.value||'animation').trim();
+      const blob = new Blob([JSON.stringify(lottieData,null,2)], { type:'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = base + '.json';
       a.click();
     });
 
-    // Helper to record WebM
-    function recordWebM(frames, fps) {
+    // Helpers
+    function recordWebM(frames, fps, onProgress) {
       return new Promise(res => {
-        const canvas = document.createElement('canvas');
-        canvas.width = frames[0].dims.width;
-        canvas.height = frames[0].dims.height;
-        const ctx = canvas.getContext('2d');
-
-        const stream = canvas.captureStream(fps);
+        const c = document.createElement('canvas');
+        c.width = frames[0].dims.width; c.height = frames[0].dims.height;
+        const ctx = c.getContext('2d');
+        const stream = c.captureStream(fps);
         const rec = new MediaRecorder(stream, { mimeType: videoMime });
         const chunks = [];
         rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
@@ -201,72 +146,70 @@
         (function draw() {
           if (i >= frames.length) return rec.stop();
           const f = frames[i++];
-          ctx.putImageData(new ImageData(
-            new Uint8ClampedArray(f.patch),
-            f.dims.width, f.dims.height
-          ), 0, 0);
+          ctx.putImageData(
+            new ImageData(new Uint8ClampedArray(f.patch), f.dims.width, f.dims.height),
+            0, 0
+          );
+          onProgress(i / frames.length);
           setTimeout(draw, delay);
         })();
       });
     }
 
-    // Helper to convert WebM → Lottie
-    async function webmToLottie(blob, fps) {
+    async function webmToLottie(blob, fps, onProgress) {
       const vid = document.createElement('video');
       vid.src = URL.createObjectURL(blob);
-      vid.muted = true;
-      vid.playsInline = true;
-      await vid.play().catch(() => {});
-      vid.pause();
+      vid.muted = true; vid.playsInline = true;
+      await vid.play().catch(()=>{}); vid.pause();
 
-      // Wait for metadata
       await new Promise(r => {
         if (vid.readyState >= 1) return r();
         vid.addEventListener('loadedmetadata', r, { once: true });
       });
 
       const duration = vid.duration;
-      const totalFrames = Math.min(gifFrames.length, fps);
-      const canvas = document.createElement('canvas');
-      canvas.width = vid.videoWidth;
-      canvas.height = vid.videoHeight;
-      const ctx = canvas.getContext('2d');
+      const total = Math.min(fps, gifFrames.length);
+      const c = document.createElement('canvas');
+      c.width = vid.videoWidth; c.height = vid.videoHeight;
+      const ctx = c.getContext('2d');
 
       const images = [];
-      for (let i = 0; i < totalFrames; i++) {
-        vid.currentTime = (i / totalFrames) * duration;
+      for (let i = 0; i < total; i++) {
+        vid.currentTime = (i / total) * duration;
         await new Promise(r => vid.onseeked = r);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(vid, 0, 0);
-        images.push(canvas.toDataURL('image/png'));
+        ctx.clearRect(0,0,c.width,c.height);
+        ctx.drawImage(vid,0,0);
+        images.push(c.toDataURL('image/png'));
+        onProgress((i+1) / total);
       }
 
-      const assets = images.map((d, i) => ({
-        id: `img_${i}`, w: canvas.width, h: canvas.height, p: d, e: 1
+      const assets = images.map((d,i)=>({
+        id:`img_${i}`, p:d, w:c.width, h:c.height, e:1
       }));
-      const layers = images.map((_, i) => ({
-        ddd: 0, ind: i+1, ty: 2, refId: `img_${i}`,
-        ks: {
-          o: { a:0, k:100 }, r:{ a:0, k:0 },
-          p: { a:0, k:[canvas.width/2, canvas.height/2, 0] },
-          a: { a:0, k:[canvas.width/2, canvas.height/2, 0] },
-          s: { a:0, k:[100,100,100] }
+      const layers = images.map((_,i)=>({
+        ddd:0, ind:i+1, ty:2, refId:`img_${i}`,
+        ks:{
+          o:{a:0,k:100},r:{a:0,k:0},
+          p:{a:0,k:[c.width/2,c.height/2,0]},
+          a:{a:0,k:[c.width/2,c.height/2,0]},
+          s:{a:0,k:[100,100,100]}
         },
-        ip: i, op: i+1, st: 0, bm: 0
+        ip:i, op:i+1, st:0, bm:0
       }));
 
       return {
-        v: "5.7.4",
-        fr: fps,
-        ip: 0,
-        op: images.length,
-        w: canvas.width,
-        h: canvas.height,
-        nm: "One-Click Lottie",
-        ddd: 0,
-        assets,
-        layers
+        v:"5.7.4", fr:fps, ip:0, op:images.length,
+        w:c.width, h:c.height, nm:"One-Click Lottie", ddd:0,
+        assets, layers
       };
+    }
+
+    function previewLottie(data) {
+      lottieCont.innerHTML = '';
+      lottie.loadAnimation({
+        container:lottieCont, renderer:'svg',
+        loop:true, autoplay:true, animationData:data
+      });
     }
   </script>
 </body>
