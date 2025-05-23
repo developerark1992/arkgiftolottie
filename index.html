@@ -58,8 +58,8 @@
 
     <div class="section">
       <h3>1. Original GIF</h3>
-      <img id="gifPreview"
-           src="favicon.png"
+      <img class="profile-icon" id="gifPreview"
+           src="https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif"
            alt="No GIF selected" />
     </div>
 
@@ -73,6 +73,7 @@
       <h3>3. Optimized Lottie Animation</h3>
       <div id="lottieContainer"></div>
       <button id="downloadLottieBtn" disabled>Download Lottie JSON</button>
+      <button id="resetBtn" disabled>Reset</button>
     </div>
 
     <div class="footer">
@@ -85,27 +86,28 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
-    const gifInput        = document.getElementById('gifInput');
-    const fileNameInput   = document.getElementById('fileNameInput');
-    const frameCountInput = document.getElementById('frameCountInput');
-    const scaleInput      = document.getElementById('scaleInput');
-    const convertBtn      = document.getElementById('convertBtn');
-    const progressWrap    = document.getElementById('progressContainer');
-    const progressBar     = document.getElementById('progressBar');
-    const statusText      = document.getElementById('status');
-    const videoPreview    = document.getElementById('videoPreview');
-    const downloadVideoBtn= document.getElementById('downloadVideoBtn');
-    const lottieContainer = document.getElementById('lottieContainer');
-    const downloadLottieBtn = document.getElementById('downloadLottieBtn');
+    const gifInput         = document.getElementById('gifInput');
+    const fileNameInput    = document.getElementById('fileNameInput');
+    const frameCountInput  = document.getElementById('frameCountInput');
+    const scaleInput       = document.getElementById('scaleInput');
+    const convertBtn       = document.getElementById('convertBtn');
+    const progressWrap     = document.getElementById('progressContainer');
+    const progressBar      = document.getElementById('progressBar');
+    const statusText       = document.getElementById('status');
+    const videoPreview     = document.getElementById('videoPreview');
+    const downloadVideoBtn = document.getElementById('downloadVideoBtn');
+    const lottieContainer  = document.getElementById('lottieContainer');
+    const downloadLottieBtn= document.getElementById('downloadLottieBtn');
+    const resetBtn         = document.getElementById('resetBtn');
 
     let gifFrames = null, lottieData = null;
-    const fps = 30, videoMime = 'video/webm; codecs=vp8,opus', videoExt = '.webm';
+    const fps = 30, videoMime = 'video/webm; codecs=vp8,opus';
 
     gifInput.addEventListener('change', async () => {
       resetAll();
       const file = gifInput.files[0];
       if (!file) return;
-      gifPreview.src = URL.createObjectURL(file);
+      document.getElementById('gifPreview').src = URL.createObjectURL(file);
       const buf = await file.arrayBuffer();
       const parsed = parseGIF(buf);
       gifFrames = decompressFrames(parsed, true);
@@ -115,11 +117,13 @@
     convertBtn.addEventListener('click', async () => {
       convertBtn.disabled = true;
       downloadLottieBtn.disabled = true;
+      resetBtn.disabled = true;
       progressBar.value = 0;
       statusText.textContent = 'Recording WebM…';
       progressWrap.style.display = 'block';
 
       // 1) Record WebM (0–50%)
+      // (you can wire up downloadVideoBtn here if desired)
       const webm = await recordWebM(gifFrames, fps, p => {
         progressBar.value = p * 50;
       });
@@ -147,7 +151,11 @@
       a.href = URL.createObjectURL(blob);
       a.download = base + '.json';
       a.click();
+      // enable reset once download is triggered
+      resetBtn.disabled = false;
     });
+
+    resetBtn.addEventListener('click', resetAll);
 
     function recordWebM(frames, fps, onProg) {
       return new Promise(res => {
@@ -197,10 +205,10 @@
         return canvas.toDataURL('image/png');
       });
 
-      const assets = images.map((d,i)=>({
+      const assets = images.map((d,i)=>(({
         id:`img_${i}`, w:W, h:H, p:d, e:1
-      }));
-      const layers = images.map((_,i)=>({
+      })));
+      const layers = images.map((_,i)=>(({
         ddd:0, ind:i+1, ty:2, refId:`img_${i}`,
         ks:{
           o:{a:0,k:100}, r:{a:0,k:0},
@@ -209,7 +217,7 @@
           s:{a:0,k:[100,100,100]}
         },
         ip:i, op:i+1, st:0, bm:0
-      }));
+      })));
 
       return {
         v:"5.7.4", fr:fps, ip:0, op:images.length,
@@ -221,8 +229,11 @@
     function previewLottie(data) {
       lottieContainer.innerHTML = '';
       lottie.loadAnimation({
-        container:lottieContainer, renderer:'svg',
-        loop:true, autoplay:true, animationData:data
+        container:lottieContainer,
+        renderer:'svg',
+        loop:true,
+        autoplay:true,
+        animationData:data
       });
     }
 
@@ -234,6 +245,7 @@
       convertBtn.disabled = true;
       downloadVideoBtn.disabled = true;
       downloadLottieBtn.disabled = true;
+      resetBtn.disabled = true;
       progressWrap.style.display = 'none';
       progressBar.value = 0;
       statusText.textContent = '';
