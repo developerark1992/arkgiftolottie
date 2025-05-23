@@ -123,7 +123,7 @@
       previewBox.innerHTML = '';
       downloadBtn.disabled = true;
       hideProgress();
-      fileInput.value = '';
+      // **do not clear** fileInput.value here
     }
     function once(el,ev){
       return new Promise(res=>el.addEventListener(ev,res,{once:true}));
@@ -166,7 +166,7 @@
       }
     }
 
-    // File loaded → show proper buttons
+    // File loaded → show relevant actions
     fileInput.onchange = async()=>{
       resetAll();
       const f = fileInput.files[0]; if(!f) return;
