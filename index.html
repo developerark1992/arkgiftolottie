@@ -58,8 +58,8 @@
 
     <div class="section">
       <h3>1. Original GIF</h3>
-      <img  id="gifPreview"
-           src="favicon.png"
+      <img id="gifPreview"
+           src="https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif"
            alt="No GIF selected" />
     </div>
 
@@ -107,7 +107,7 @@
       resetAll();
       const file = gifInput.files[0];
       if (!file) return;
-      document.getElementById('gifPreview').src = URL.createObjectURL(file);
+      gifPreview.src = URL.createObjectURL(file);
       const buf = await file.arrayBuffer();
       const parsed = parseGIF(buf);
       gifFrames = decompressFrames(parsed, true);
@@ -123,8 +123,7 @@
       progressWrap.style.display = 'block';
 
       // 1) Record WebM (0–50%)
-      // (you can wire up downloadVideoBtn here if desired)
-      const webm = await recordWebM(gifFrames, fps, p => {
+      await recordWebM(gifFrames, fps, p => {
         progressBar.value = p * 50;
       });
 
@@ -142,6 +141,7 @@
       statusText.textContent = 'Complete!';
       previewLottie(lottieData);
       downloadLottieBtn.disabled = false;
+      resetBtn.disabled = false;  // enable Reset once preview is shown
     });
 
     downloadLottieBtn.addEventListener('click', () => {
@@ -151,8 +151,6 @@
       a.href = URL.createObjectURL(blob);
       a.download = base + '.json';
       a.click();
-      // enable reset once download is triggered
-      resetBtn.disabled = false;
     });
 
     resetBtn.addEventListener('click', resetAll);
@@ -166,16 +164,16 @@
         const rec = new MediaRecorder(stream, { mimeType: videoMime });
         const chunks = [];
         rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-        rec.onstop = () => res(new Blob(chunks, { type: videoMime }));
+        rec.onstop = () => res();
         rec.start();
         let i=0, delay=1000/fps;
         (function draw(){
-          if(i>=frames.length) return rec.stop();
+          if (i >= frames.length) return rec.stop();
           const f = frames[i++];
           ctx.putImageData(new ImageData(
             new Uint8ClampedArray(f.patch),
             f.dims.width, f.dims.height
-          ),0,0);
+          ), 0, 0);
           onProg(i/frames.length);
           setTimeout(draw, delay);
         })();
@@ -205,10 +203,10 @@
         return canvas.toDataURL('image/png');
       });
 
-      const assets = images.map((d,i)=>(({
+      const assets = images.map((d,i)=>({
         id:`img_${i}`, w:W, h:H, p:d, e:1
-      })));
-      const layers = images.map((_,i)=>(({
+      }));
+      const layers = images.map((_,i)=>({
         ddd:0, ind:i+1, ty:2, refId:`img_${i}`,
         ks:{
           o:{a:0,k:100}, r:{a:0,k:0},
@@ -217,7 +215,7 @@
           s:{a:0,k:[100,100,100]}
         },
         ip:i, op:i+1, st:0, bm:0
-      })));
+      }));
 
       return {
         v:"5.7.4", fr:fps, ip:0, op:images.length,
@@ -229,15 +227,16 @@
     function previewLottie(data) {
       lottieContainer.innerHTML = '';
       lottie.loadAnimation({
-        container:lottieContainer,
-        renderer:'svg',
-        loop:true,
-        autoplay:true,
-        animationData:data
+        container: lottieContainer,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        animationData: data
       });
     }
 
     function resetAll() {
+      gifInput.value = '';
       document.getElementById('gifPreview').src =
         'https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif';
       videoPreview.src = '';
