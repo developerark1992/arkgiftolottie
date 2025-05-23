@@ -60,9 +60,7 @@
 
     <div class="section">
       <h3>1. Original GIF</h3>
-      <img id="gifPreview"
-           src="favicon.png"
-           alt="No GIF selected" />
+      <img id="gifPreview" src="favicon.png" alt="No GIF selected" />
     </div>
 
     <div class="section" style="display:none;">
@@ -87,6 +85,7 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
+    // DOM refs
     const gifInput          = document.getElementById('gifInput');
     const fileNameInput     = document.getElementById('fileNameInput');
     const frameCountInput   = document.getElementById('frameCountInput');
@@ -96,20 +95,32 @@
     const progressWrap      = document.getElementById('progressContainer');
     const progressBar       = document.getElementById('progressBar');
     const statusText        = document.getElementById('status');
+    const gifPreview        = document.getElementById('gifPreview');
     const videoPreview      = document.getElementById('videoPreview');
     const downloadVideoBtn  = document.getElementById('downloadVideoBtn');
     const lottieContainer   = document.getElementById('lottieContainer');
     const downloadLottieBtn = document.getElementById('downloadLottieBtn');
 
+    // defaults
+    const DEFAULT_GIF_SRC       = 'favicon.png';
+    const DEFAULT_FILENAME      = 'animation';
+    const DEFAULT_FRAME_COUNT   = 15;
+    const DEFAULT_SCALE_PERCENT = 50;
+    const DEFAULT_STATUS        = 'Waiting…';
+
     let gifFrames = null, lottieData = null;
     const fps = 30, videoMime = 'video/webm; codecs=vp8,opus';
 
-    // Reset button handler
+    // RESET button
     resetBtn.addEventListener('click', () => {
       gifInput.value = '';
+      fileNameInput.value   = DEFAULT_FILENAME;
+      frameCountInput.value = DEFAULT_FRAME_COUNT;
+      scaleInput.value      = DEFAULT_SCALE_PERCENT;
       resetAll();
     });
 
+    // GIF selection
     gifInput.addEventListener('change', async () => {
       resetAll();
       const file = gifInput.files[0];
@@ -117,7 +128,6 @@
 
       gifPreview.src = URL.createObjectURL(file);
 
-      // Try to parse & decompress; catch memory errors
       try {
         const buf = await file.arrayBuffer();
         const parsed = parseGIF(buf);
@@ -131,6 +141,7 @@
       convertBtn.disabled = !gifFrames.length;
     });
 
+    // CONVERT button
     convertBtn.addEventListener('click', async () => {
       convertBtn.disabled = true;
       downloadLottieBtn.disabled = true;
@@ -159,8 +170,9 @@
       downloadLottieBtn.disabled = false;
     });
 
+    // DOWNLOAD Lottie JSON
     downloadLottieBtn.addEventListener('click', () => {
-      const base = fileNameInput.value.trim() || 'animation';
+      const base = (fileNameInput.value.trim() || 'animation');
       const blob = new Blob([JSON.stringify(lottieData, null, 2)], { type:'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -168,6 +180,7 @@
       a.click();
     });
 
+    // helper: record WebM
     function recordWebM(frames, fps, onProg) {
       return new Promise(res => {
         const c = document.createElement('canvas');
@@ -193,6 +206,7 @@
       });
     }
 
+    // helper: build Lottie JSON
     async function buildLottieFromGif(frames, total, scale, onProg) {
       const origW = frames[0].dims.width, origH = frames[0].dims.height;
       const picks = Array.from({length:total}, (_,i)=>Math.floor(i*frames.length/total));
@@ -237,6 +251,7 @@
       };
     }
 
+    // helper: render Lottie preview
     function previewLottie(data) {
       lottieContainer.innerHTML = '';
       lottie.loadAnimation({
@@ -248,20 +263,23 @@
       });
     }
 
+    // reset view to load-time defaults
     function resetAll() {
-      document.getElementById('gifPreview').src =
-        'https://upload.wikimedia.org/wikipedia/commons/2/2d/GIF_file_format_icon.gif';
-      videoPreview.src = '';
+      gifPreview.src            = DEFAULT_GIF_SRC;
+      videoPreview.src          = '';
       lottieContainer.innerHTML = '';
-      convertBtn.disabled = true;
+      convertBtn.disabled       = true;
       downloadVideoBtn.disabled = true;
-      downloadLottieBtn.disabled = true;
+      downloadLottieBtn.disabled= true;
       progressWrap.style.display = 'none';
-      progressBar.value = 0;
-      statusText.textContent = '';
+      progressBar.value          = 0;
+      statusText.textContent     = DEFAULT_STATUS;
       gifFrames = null;
       lottieData = null;
     }
+
+    // initial reset on load
+    resetAll();
   </script>
 </body>
 </html>
