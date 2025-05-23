@@ -104,7 +104,15 @@
     const fps = 30, videoMime = 'video/webm; codecs=vp8,opus';
 
     gifInput.addEventListener('change', async () => {
-      resetAll();
+      // only clear previous previews/UI, do NOT fully reset everything
+      lottieContainer.innerHTML = '';
+      videoPreview.src = '';
+      progressWrap.style.display = 'none';
+      progressBar.value = 0;
+      statusText.textContent = '';
+      downloadLottieBtn.disabled = true;
+      resetBtn.disabled = true;
+
       const file = gifInput.files[0];
       if (!file) return;
       gifPreview.src = URL.createObjectURL(file);
@@ -122,26 +130,21 @@
       statusText.textContent = 'Recording WebM…';
       progressWrap.style.display = 'block';
 
-      // 1) Record WebM (0–50%)
-      await recordWebM(gifFrames, fps, p => {
-        progressBar.value = p * 50;
-      });
+      await recordWebM(gifFrames, fps, p => progressBar.value = p * 50);
 
-      // 2) Build Lottie (50–100%)
       statusText.textContent = 'Building Lottie JSON…';
       lottieData = await buildLottieFromGif(
         gifFrames,
         parseInt(frameCountInput.value),
         parseFloat(scaleInput.value)/100,
-        p => { progressBar.value = 50 + p * 50; }
+        p => progressBar.value = 50 + p * 50
       );
 
-      // Done
       progressBar.value = 100;
       statusText.textContent = 'Complete!';
       previewLottie(lottieData);
       downloadLottieBtn.disabled = false;
-      resetBtn.disabled = false;  // enable Reset once preview is shown
+      resetBtn.disabled = false;  // now allow reset
     });
 
     downloadLottieBtn.addEventListener('click', () => {
@@ -166,15 +169,16 @@
         rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
         rec.onstop = () => res();
         rec.start();
-        let i=0, delay=1000/fps;
+
+        let i = 0, delay = 1000 / fps;
         (function draw(){
           if (i >= frames.length) return rec.stop();
           const f = frames[i++];
-          ctx.putImageData(new ImageData(
-            new Uint8ClampedArray(f.patch),
-            f.dims.width, f.dims.height
-          ), 0, 0);
-          onProg(i/frames.length);
+          ctx.putImageData(
+            new ImageData(new Uint8ClampedArray(f.patch), f.dims.width, f.dims.height),
+            0, 0
+          );
+          onProg(i / frames.length);
           setTimeout(draw, delay);
         })();
       });
@@ -195,7 +199,7 @@
         const f = frames[idx];
         tctx.putImageData(
           new ImageData(new Uint8ClampedArray(f.patch), origW, origH),
-          0,0
+          0, 0
         );
         ctx.clearRect(0,0,W,H);
         ctx.drawImage(tmp,0,0,origW,origH,0,0,W,H);
