@@ -100,7 +100,7 @@
   // Load gif.js dynamically & set worker path (host gif.worker.js locally at ./js/gif.worker.js)
   let GIF = null;
   const gifScript = document.createElement('script');
-  gifScript.src = "js/gif.worker.js"; // IMPORTANT: HOST gif.worker.js LOCALLY here!
+  gifScript.src = "/gif.worker.js"; // IMPORTANT: HOST gif.worker.js LOCALLY here!
   document.head.appendChild(gifScript);
   gifScript.onload = () => {
     GIF = window.GIF;
