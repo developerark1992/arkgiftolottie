@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Animation Converter without ffmpeg.wasm</title>
+<title>Animation Converter - Best Practice</title>
 <style>
   body { background:#121212; color:#e0e0e0; font-family:'Segoe UI',sans-serif; padding:2rem; margin:0; display:flex; justify-content:center; }
   .card { background:#1e1e1e; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); padding:2rem; width:90%; max-width:700px }
@@ -35,7 +35,7 @@
 </head>
 <body>
 <div class="card">
-  <h2>Animation Converter (no ffmpeg.wasm)</h2>
+  <h2>Animation Converter - Best Practice</h2>
 
   <div class="section">
     <input type="file" id="fileInput" accept=".gif,.mp4,.webm,.json,.mov,.avi,.mkv" />
@@ -50,7 +50,7 @@
   <div class="section">
     <button id="toGifBtn" disabled>Convert to GIF</button>
     <button id="toLottieBtn" disabled>Convert to Lottie</button>
-    <button id="toVideoBtn" disabled title="Video conversion requires backend support or cross-origin isolation">Convert to Video (Disabled)</button>
+    <button id="toVideoBtn" disabled title="Video conversion requires backend or special server headers">Convert to Video</button>
     <button id="resetBtn">Reset All</button>
   </div>
 
@@ -134,14 +134,17 @@
     progressBar.value = 20;
     statusText.textContent = 'Uploading...';
 
-    await new Promise(r => setTimeout(r, 200)); // simulate
+    await new Promise(r => setTimeout(r, 200)); // simulate upload
 
     if (ext === 'gif') {
       gifPreview.src = URL.createObjectURL(file);
       gifPreview.style.display = 'block';
+
       toGifBtn.disabled = true;
       toLottieBtn.disabled = false;
-      toVideoBtn.disabled = true; // video conversion disabled
+      toVideoBtn.disabled = false;
+      toVideoBtn.title = "Video conversion from GIF is disabled (requires backend)";
+      toVideoBtn.style.cursor = "pointer";
 
       const buf = await file.arrayBuffer();
       statusText.textContent = 'Processing GIF...';
@@ -150,10 +153,10 @@
 
       progressBar.value = 100;
       statusText.textContent = 'Ready!';
-    }
-    else if (ext === 'json') {
-      const jsonText = await file.text();
+
+    } else if (ext === 'json') {
       try {
+        const jsonText = await file.text();
         lottieData = JSON.parse(jsonText);
       } catch {
         alert('Invalid JSON file.');
@@ -168,81 +171,99 @@
         autoplay: true,
         animationData: lottieData
       });
+
       toGifBtn.disabled = false;
       toLottieBtn.disabled = true;
-      toVideoBtn.disabled = true;
+      toVideoBtn.disabled = false;
+      toVideoBtn.title = "Video conversion from Lottie is disabled (requires backend)";
+      toVideoBtn.style.cursor = "pointer";
+
       progressBar.value = 100;
       statusText.textContent = 'Ready!';
-    }
-    else if (['mp4','webm','mov','avi','mkv'].includes(ext)) {
+
+    } else if (['mp4','webm','mov','avi','mkv'].includes(ext)) {
       videoPreview.src = URL.createObjectURL(file);
       videoPreview.style.display = 'block';
-      toGifBtn.disabled = true;
-      toLottieBtn.disabled = true;
-      toVideoBtn.disabled = true; // video conversions disabled here
+
+      toGifBtn.disabled = false;
+      toLottieBtn.disabled = false;
+      toVideoBtn.disabled = false;
+      toVideoBtn.title = "Video conversion from video is disabled (requires backend)";
+      toVideoBtn.style.cursor = "pointer";
+
       progressBar.value = 100;
       statusText.textContent = 'Preview ready. Video conversions require backend or special headers.';
       videoElement = videoPreview;
-    }
-    else {
+
+    } else {
       alert('Unsupported file type');
       resetAll();
+      return;
     }
   });
 
-  // Convert GIF to Lottie
   toLottieBtn.addEventListener('click', async () => {
-    if (!gifFrames) {
-      alert('No GIF frames found to convert.');
-      return;
+    if (fileType === 'gif' && gifFrames) {
+      progressWrap.style.display = 'block';
+      progressBar.value = 0;
+      statusText.textContent = 'Building Lottie...';
+
+      const total = parseInt(frameCountInput.value, 10);
+      const scale = parseFloat(scaleInput.value, 10) / 100;
+
+      const lottieJson = await buildLottieFromGif(gifFrames, total, scale, p => { progressBar.value = p * 100; });
+      lottieData = lottieJson;
+
+      previewLottie(lottieData);
+      statusText.textContent = 'Lottie ready!';
+    } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
+      alert('Video → Lottie conversion requires backend or special headers (not supported here).');
+    } else if (fileType === 'json') {
+      alert('This file is already a Lottie animation.');
+    } else {
+      alert('No valid input for Lottie conversion.');
     }
-    progressWrap.style.display = 'block';
-    progressBar.value = 0;
-    statusText.textContent = 'Building Lottie...';
-
-    const total = parseInt(frameCountInput.value, 10);
-    const scale = parseFloat(scaleInput.value, 10) / 100;
-
-    const lottieJson = await buildLottieFromGif(gifFrames, total, scale, p => { progressBar.value = p * 100; });
-    lottieData = lottieJson;
-
-    previewLottie(lottieData);
-    statusText.textContent = 'Lottie ready!';
   });
 
-  // Convert Lottie to GIF
   toGifBtn.addEventListener('click', async () => {
-    if (!lottieData) {
-      alert('No Lottie animation loaded to convert.');
-      return;
+    if (fileType === 'json' && lottieData) {
+      progressWrap.style.display = 'block';
+      progressBar.value = 0;
+      statusText.textContent = 'Rendering Lottie frames...';
+
+      const frames = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));
+      statusText.textContent = 'Encoding GIF...';
+
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        width: frames[0].width,
+        height: frames[0].height,
+      });
+
+      frames.forEach(f => gif.addFrame(f, { delay: 100 }));
+
+      gif.on('finished', blob => {
+        gifPreview.src = URL.createObjectURL(blob);
+        gifPreview.style.display = 'block';
+        progressBar.value = 100;
+        statusText.textContent = 'GIF ready!';
+      });
+
+      gif.render();
+    } else if (fileType === 'gif') {
+      alert('This file is already a GIF.');
+    } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
+      alert('Video → GIF conversion requires backend or special headers (not supported here).');
+    } else {
+      alert('No valid input for GIF conversion.');
     }
-    progressWrap.style.display = 'block';
-    progressBar.value = 0;
-    statusText.textContent = 'Rendering Lottie frames...';
-
-    const frames = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));
-    statusText.textContent = 'Encoding GIF...';
-
-    const gif = new GIF({
-      workers: 2,
-      quality: 10,
-      width: frames[0].width,
-      height: frames[0].height,
-    });
-
-    frames.forEach(f => gif.addFrame(f, { delay: 100 }));
-
-    gif.on('finished', blob => {
-      gifPreview.src = URL.createObjectURL(blob);
-      gifPreview.style.display = 'block';
-      progressBar.value = 100;
-      statusText.textContent = 'GIF ready!';
-    });
-
-    gif.render();
   });
 
-  // Reset button
+  toVideoBtn.addEventListener('click', () => {
+    alert('Video conversion requires backend or special server headers and is disabled here.');
+  });
+
   resetBtn.addEventListener('click', () => {
     fileInput.value = '';
     fileNameInput.value = 'animation';
@@ -250,6 +271,8 @@
     scaleInput.value = 50;
     resetAll();
   });
+
+  // Utility functions:
 
   function previewLottie(data) {
     lottieContainer.innerHTML = '';
