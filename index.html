@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Video to GIF + GIF/Lottie Converter</title>
+<title>Converter: Video / GIF / Lottie</title>
 <link rel="icon" type="image/png" href="favicon.png" />
 <style>
   body { background:#121212; color:#e0e0e0; font-family:'Segoe UI',sans-serif; padding:2rem; margin:0; display:flex; justify-content:center; }
@@ -36,7 +36,7 @@
 </head>
 <body>
 <div class="card">
-  <h2>Video to GIF + GIF/Lottie Converter</h2>
+  <h2>Converter: Video / GIF / Lottie</h2>
 
   <div class="section">
     <input type="file" id="fileInput" accept=".gif,.mp4,.webm,.json,.mov,.avi,.mkv" />
@@ -95,17 +95,17 @@
   const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB max
   const FPS = 10;
 
-  let fileType = null, fileData = null, lottieData = null, gifFrames = null, videoFrames = [];
+  let fileType = null, fileData = null, lottieData = null, gifFrames = null;
 
   // Load gif.js dynamically & set worker path (host gif.worker.js locally at ./js/gif.worker.js)
   let GIF = null;
   const gifScript = document.createElement('script');
-  gifScript.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js";
+  gifScript.src = "js/gif.worker.js"; // IMPORTANT: HOST gif.worker.js LOCALLY here!
+  document.head.appendChild(gifScript);
   gifScript.onload = () => {
     GIF = window.GIF;
     console.log('GIF.js loaded');
   };
-  document.head.appendChild(gifScript);
 
   function resetAll() {
     gifPreview.src = '';
@@ -123,7 +123,6 @@
     fileType = null;
     fileData = null;
     gifFrames = null;
-    videoFrames = [];
     lottieData = null;
   }
 
@@ -206,72 +205,85 @@
   }
 
   // Video to GIF conversion: extract frames and encode GIF client-side
-async function videoToGif(file) {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    video.src = URL.createObjectURL(file);
-    video.crossOrigin = "anonymous";
-    video.muted = true;
-    video.playsInline = true;
+  async function videoToGif(file) {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(file);
+      video.crossOrigin = "anonymous";
+      video.muted = true;
+      video.playsInline = true;
 
-    video.addEventListener('loadeddata', () => {
-      const duration = video.duration;
-      const fps = 10;
-      const totalFrames = Math.min(Math.floor(duration * fps), 50); // max 50 frames
+      video.addEventListener('loadeddata', () => {
+        const duration = video.duration;
+        const fps = FPS;
+        const totalFrames = Math.min(Math.floor(duration * fps), 50); // max 50 frames
 
-      const canvas = document.createElement('canvas');
-      const scale = parseFloat(scaleInput.value) / 100;
-      canvas.width = video.videoWidth * scale;
-      canvas.height = video.videoHeight * scale;
-      const ctx = canvas.getContext('2d');
+        const canvas = document.createElement('canvas');
+        const scale = parseFloat(scaleInput.value) / 100;
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        const ctx = canvas.getContext('2d');
 
-      const gif = new GIF({
-        workers: 2,
-        quality: 10,
-        width: canvas.width,
-        height: canvas.height,
-        workerScript: './js/gif.worker.js' // ensure this file exists on your server
-      });
+        const gif = new GIF({
+          workers: 2,
+          quality: 10,
+          width: canvas.width,
+          height: canvas.height,
+          workerScript: 'js/gif.worker.js' // Update path to your hosted gif.worker.js
+        });
 
-      let currentFrame = 0;
+        let currentFrame = 0;
 
-      function captureFrame() {
-        if (currentFrame >= totalFrames) {  // <-- FIXED HERE
-          gif.render();
-          return;
+        function captureFrame() {
+          if (currentFrame >= totalFrames) {
+            gif.render();
+            return;
+          }
+          video.currentTime = currentFrame / fps;
         }
-        video.currentTime = currentFrame / fps;
-      }
 
-      video.addEventListener('seeked', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        gif.addFrame(ctx, { delay: 100 });
-        currentFrame++;
-        statusText.textContent = `Capturing frame ${currentFrame} of ${totalFrames}`;
-        progressBar.value = (currentFrame / totalFrames) * 100;
+        video.addEventListener('seeked', () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          gif.addFrame(ctx, { delay: 100 });
+          currentFrame++;
+          statusText.textContent = `Capturing frame ${currentFrame} of ${totalFrames}`;
+          progressBar.value = (currentFrame / totalFrames) * 100;
 
-        if (currentFrame < totalFrames) {
-          captureFrame();
-        }
+          if (currentFrame < totalFrames) {
+            captureFrame();
+          }
+        });
+
+        gif.on('finished', blob => {
+          statusText.textContent = 'GIF ready! Download starting...';
+          progressBar.value = 100;
+          resolve(blob);
+        });
+
+        captureFrame();
       });
 
-      gif.on('finished', blob => {
-        statusText.textContent = 'GIF ready! Download starting...';
-        progressBar.value = 100;
-        resolve(blob);
-      });
-
-      captureFrame();
+      video.onerror = () => reject('Failed to load video.');
     });
+  }
 
-    video.onerror = () => reject('Failed to load video.');
-  });
-}
+  // GIF → Lottie conversion - NOT IMPLEMENTED client-side
+  function gifToLottie() {
+    alert('GIF to Lottie conversion requires backend processing and is not supported client-side.');
+  }
 
+  // Lottie → GIF conversion - NOT IMPLEMENTED client-side
+  function lottieToGif() {
+    alert('Lottie to GIF conversion requires backend processing and is not supported client-side.');
+  }
 
-  // Event handlers for conversion buttons
+  // GIF/Lottie → Video conversion - NOT IMPLEMENTED client-side
+  function toVideoAlert() {
+    alert('Video conversion requires backend processing and is not supported client-side.');
+  }
 
+  // Button events
   toGifBtn.addEventListener('click', async () => {
     toGifBtn.disabled = true;
     toLottieBtn.disabled = true;
@@ -284,7 +296,7 @@ async function videoToGif(file) {
       if (fileType === 'gif') {
         alert('You already uploaded a GIF.');
       } else if (fileType === 'json') {
-        alert('Lottie to GIF conversion not supported client-side.');
+        lottieToGif();
       } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
         const gifBlob = await videoToGif(fileData);
         gifPreview.src = URL.createObjectURL(gifBlob);
@@ -304,11 +316,19 @@ async function videoToGif(file) {
   });
 
   toLottieBtn.addEventListener('click', () => {
-    alert('Lottie conversion from video or GIF requires backend processing.');
+    if (fileType === 'gif') {
+      gifToLottie();
+    } else if (fileType === 'json') {
+      alert('You already uploaded a Lottie JSON.');
+    } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
+      alert('Video to Lottie conversion requires backend processing and is not supported client-side.');
+    } else {
+      alert('Unsupported file for Lottie conversion.');
+    }
   });
 
   toVideoBtn.addEventListener('click', () => {
-    alert('Video conversion functionality coming soon.');
+    toVideoAlert();
   });
 
   resetBtn.addEventListener('click', () => {
@@ -319,7 +339,10 @@ async function videoToGif(file) {
     resetAll();
   });
 
+  resetAll();
+
 </script>
+
 <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js"></script>
 </body>
 </html>
