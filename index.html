@@ -181,9 +181,10 @@
       videoPreview.src = URL.createObjectURL(file);
       videoPreview.style.display = 'block';
 
-      toGifBtn.disabled = false;      // Enable toGifBtn for GIF conversion (canvas recording)
-      toLottieBtn.disabled = false;   // Enable toLottieBtn (can show alert, no actual conversion client-side)
-      toVideoBtn.disabled = true;     // Video→Video conversion not needed
+      // Video conversion buttons disabled, show alert on convert
+      toGifBtn.disabled = false;
+      toLottieBtn.disabled = false;
+      toVideoBtn.disabled = true;
 
       progressBar.value = 100;
       statusText.textContent = 'Video preview loaded. Video → GIF/Lottie conversion requires backend processing.';
@@ -246,7 +247,7 @@
         quality: 10,
         width: frames[0].width,
         height: frames[0].height,
-        workerScript: './js/gif.worker.js' // local worker path
+        workerScript: './js/gif.worker.js' // local worker path, must host this file yourself
       });
 
       frames.forEach(f => gif.addFrame(f, { delay: 100 }));
@@ -435,7 +436,7 @@
     tmp.height = origH;
     const tctx = tmp.getContext('2d');
 
-    const images = picks.map(idx => {
+    return picks.map(idx => {
       const f = frames[idx];
       tctx.putImageData(
         new ImageData(new Uint8ClampedArray(f.patch), origW, origH),
@@ -446,12 +447,9 @@
       // return canvas for recording
       return canvas;
     });
-
-    // Return array of canvases to record video
-    return images;
   }
 
-  // Record array of canvas frames to WebM video blob
+  // Record canvas frames to WebM video blob
   async function recordCanvasFramesToVideo(frames, fps, onProgress) {
     return new Promise((resolve) => {
       if (!frames || !frames.length) return resolve(null);
@@ -494,7 +492,7 @@
     });
   }
 
-  // Load GIF.js library dynamically for GIF encoding
+  // Load GIF.js locally: you MUST host gif.worker.js locally at ./js/gif.worker.js
   const gifScript = document.createElement('script');
   gifScript.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js";
   document.head.appendChild(gifScript);
