@@ -51,6 +51,7 @@
   <div class="section">
     <button id="toGifBtn" disabled>Convert to GIF</button>
     <button id="toLottieBtn" disabled>Convert to Lottie</button>
+    <button id="toVideoBtn" disabled>Convert to Video</button>
     <button id="resetBtn">Reset All</button>
   </div>
 
@@ -82,6 +83,7 @@
   const scaleInput      = document.getElementById('scaleInput');
   const toGifBtn        = document.getElementById('toGifBtn');
   const toLottieBtn     = document.getElementById('toLottieBtn');
+  const toVideoBtn      = document.getElementById('toVideoBtn');
   const resetBtn        = document.getElementById('resetBtn');
   const progressWrap    = document.getElementById('progressContainer');
   const progressBar     = document.getElementById('progressBar');
@@ -104,6 +106,7 @@
     lottieContainer.style.display = 'none';
     toGifBtn.disabled = true;
     toLottieBtn.disabled = true;
+    toVideoBtn.disabled = true;
     progressWrap.style.display = 'none';
     progressBar.value = 0;
     statusText.textContent = 'Waiting…';
@@ -139,6 +142,7 @@
       gifPreview.style.display = 'block';
       toGifBtn.disabled = true;
       toLottieBtn.disabled = false;
+      toVideoBtn.disabled = false;
 
       const buf = await file.arrayBuffer();
       statusText.textContent = 'Processing GIF...';
@@ -168,6 +172,7 @@
 
       toGifBtn.disabled = false;
       toLottieBtn.disabled = true;
+      toVideoBtn.disabled = false;
 
       progressBar.value = 100;
       statusText.textContent = 'Ready!';
@@ -176,10 +181,12 @@
       videoPreview.src = URL.createObjectURL(file);
       videoPreview.style.display = 'block';
 
-      toGifBtn.disabled = true;
-      toLottieBtn.disabled = true;
-      statusText.textContent = 'Video preview loaded. Video → GIF/Lottie requires backend processing.';
+      toGifBtn.disabled = false;      // Enable toGifBtn for GIF conversion (canvas recording)
+      toLottieBtn.disabled = false;   // Enable toLottieBtn (can show alert, no actual conversion client-side)
+      toVideoBtn.disabled = true;     // Video→Video conversion not needed
+
       progressBar.value = 100;
+      statusText.textContent = 'Video preview loaded. Video → GIF/Lottie conversion requires backend processing.';
 
     } else {
       alert('Unsupported file type');
@@ -217,6 +224,8 @@
       const blob = new Blob([JSON.stringify(lottieJson, null, 2)], { type: 'application/json' });
       autoDownload(blob, (fileNameInput.value || 'animation') + '.json');
 
+    } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
+      alert('Video to Lottie conversion requires backend processing.');
     } else {
       alert('Please upload a GIF to convert to Lottie.');
     }
@@ -237,7 +246,7 @@
         quality: 10,
         width: frames[0].width,
         height: frames[0].height,
-        workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js'
+        workerScript: './js/gif.worker.js' // local worker path
       });
 
       frames.forEach(f => gif.addFrame(f, { delay: 100 }));
@@ -252,8 +261,45 @@
       });
 
       gif.render();
+
+    } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
+      alert('Video to GIF conversion requires backend processing.');
     } else {
       alert('Please upload a Lottie JSON file to convert to GIF.');
+    }
+  });
+
+  // GIF/Lottie → Video conversion (WebM via MediaRecorder)
+  toVideoBtn.addEventListener('click', async () => {
+    if ((fileType === 'gif' && gifFrames) || (fileType === 'json' && lottieData)) {
+      progressWrap.style.display = 'block';
+      progressBar.value = 0;
+      statusText.textContent = 'Recording video...';
+
+      let framesToRecord;
+
+      if (fileType === 'gif') {
+        framesToRecord = await renderGifFramesToCanvas(gifFrames, parseInt(frameCountInput.value, 10));
+      } else if (fileType === 'json') {
+        framesToRecord = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));
+      }
+
+      const videoBlob = await recordCanvasFramesToVideo(framesToRecord, FPS, p => {
+        progressBar.value = p * 100;
+      });
+
+      if (videoBlob) {
+        const videoUrl = URL.createObjectURL(videoBlob);
+        videoPreview.src = videoUrl;
+        videoPreview.style.display = 'block';
+        autoDownload(videoBlob, (fileNameInput.value || 'animation') + '.webm');
+        statusText.textContent = 'Video ready! Download starting...';
+      } else {
+        alert('Video recording failed.');
+      }
+
+    } else {
+      alert('Upload a GIF or Lottie to convert to video.');
     }
   });
 
@@ -265,7 +311,7 @@
     resetAll();
   });
 
-  // Helper to preview Lottie animation
+  // Preview Lottie animation
   function previewLottie(data) {
     lottieContainer.innerHTML = '';
     lottie.loadAnimation({
@@ -328,7 +374,7 @@
     };
   }
 
-  // Render lottie frames for GIF encoding
+  // Render Lottie frames for GIF encoding
   async function renderLottieToFrames(data, totalFrames) {
     return new Promise(resolve => {
       const frames = [];
@@ -375,15 +421,86 @@
     });
   }
 
+  // Render GIF frames to canvas array for video recording
+  async function renderGifFramesToCanvas(frames, totalFrames) {
+    const origW = frames[0].dims.width, origH = frames[0].dims.height;
+    const picks = Array.from({ length: totalFrames }, (_, i) => Math.floor(i * frames.length / totalFrames));
+    const W = origW, H = origH;
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const tmp = document.createElement('canvas');
+    tmp.width = origW;
+    tmp.height = origH;
+    const tctx = tmp.getContext('2d');
+
+    const images = picks.map(idx => {
+      const f = frames[idx];
+      tctx.putImageData(
+        new ImageData(new Uint8ClampedArray(f.patch), origW, origH),
+        0, 0
+      );
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(tmp, 0, 0);
+      // return canvas for recording
+      return canvas;
+    });
+
+    // Return array of canvases to record video
+    return images;
+  }
+
+  // Record array of canvas frames to WebM video blob
+  async function recordCanvasFramesToVideo(frames, fps, onProgress) {
+    return new Promise((resolve) => {
+      if (!frames || !frames.length) return resolve(null);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = frames[0].width;
+      canvas.height = frames[0].height;
+      const ctx = canvas.getContext('2d');
+
+      const stream = canvas.captureStream(fps);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks = [];
+
+      recorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        resolve(new Blob(chunks, { type: 'video/webm' }));
+      };
+
+      recorder.start();
+
+      let i = 0;
+      const totalFrames = frames.length;
+
+      function drawFrame() {
+        if (i >= totalFrames) {
+          recorder.stop();
+          return;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(frames[i], 0, 0);
+        i++;
+        onProgress(i / totalFrames);
+        setTimeout(drawFrame, 1000 / fps);
+      }
+
+      drawFrame();
+    });
+  }
+
   // Load GIF.js library dynamically for GIF encoding
   const gifScript = document.createElement('script');
   gifScript.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js";
   document.head.appendChild(gifScript);
-
   gifScript.onload = () => {
     console.log("GIF.js loaded");
   };
-
 </script>
 </body>
 </html>
