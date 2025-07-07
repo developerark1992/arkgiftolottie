@@ -61,7 +61,7 @@
     </div>
 
     <div class="section">
-      <h3>1. Preview</h3>
+      <h3>Preview</h3>
       <img id="gifPreview" style="display:none" alt="GIF Preview" />
       <video id="videoPreview" controls style="display:none"></video>
       <div id="lottieContainer" style="display:none"></div>
@@ -139,6 +139,7 @@
         const buf = await file.arrayBuffer();
         const parsed = parseGIF(buf);
         gifFrames = decompressFrames(parsed, true);
+        toGifBtn.disabled = true; // Already a GIF!
       }
       else if (ext === 'json') {
         // Load & preview Lottie
@@ -154,17 +155,19 @@
         });
         toGifBtn.disabled = false;
         toVideoBtn.disabled = false;
+        toLottieBtn.disabled = true; // Already a Lottie!
         fileData = lottieData;
       }
       else if (ext === 'mp4' || ext === 'webm') {
         videoPreview.src = URL.createObjectURL(file);
         videoPreview.style.display = 'block';
-        videoPreview.load();
-        videoElement = videoPreview;
         fileData = file;
-        toGifBtn.disabled = false;
-        // To Lottie (frame sequence Lottie) is possible but can be huge/slow, so disabled for now
-        toLottieBtn.disabled = true;
+        videoPreview.onloadedmetadata = () => {
+          videoElement = videoPreview;
+          toGifBtn.disabled = false;      // Now ready to convert to GIF
+          toVideoBtn.disabled = true;     // Not needed (video to video)
+          toLottieBtn.disabled = true;    // Not practical for arbitrary video
+        };
       }
       else {
         alert('Unsupported file type.');
@@ -361,20 +364,26 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
-        video.currentTime = 0;
-        let step = video.duration / totalFrames, i = 0;
-        function capture() {
-          if (i >= totalFrames) return resolve(frames);
-          video.currentTime = i * step;
+        let i = 0;
+        const step = video.duration / totalFrames;
+        function grabFrame(time) {
+          video.currentTime = time;
         }
         video.addEventListener('seeked', function handler() {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          frames.push(canvas.cloneNode(true));
+          const frame = document.createElement('canvas');
+          frame.width = canvas.width; frame.height = canvas.height;
+          frame.getContext('2d').drawImage(canvas, 0, 0);
+          frames.push(frame);
           i++;
-          if (i < totalFrames) capture();
-          else video.removeEventListener('seeked', handler);
+          if (i < totalFrames) {
+            grabFrame(i * step);
+          } else {
+            video.removeEventListener('seeked', handler);
+            resolve(frames);
+          }
         });
-        capture();
+        grabFrame(0);
       });
     }
 
