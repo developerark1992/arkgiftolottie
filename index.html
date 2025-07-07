@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Universal Animation Converter</title>
+  <title>ARK Animation Converter</title>
   <link rel="icon" type="image/png" href="favicon.png" />
   <style>
     body { background:#121212; color:#e0e0e0; display:flex; justify-content:center; padding:2rem; margin:0; font-family:'Segoe UI',sans-serif }
@@ -39,7 +39,7 @@
   <div class="card">
     <div class="header">
       <img src="favicon.png" alt="Abdul Rehman Khan" class="profile-icon" />
-      <h2>Universal Animation Converter</h2>
+      <h2>ARK Animation Converter</h2>
     </div>
 
     <div class="section">
@@ -78,6 +78,9 @@
     import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
     import lottie from 'https://esm.sh/lottie-web';
 
+    // IMPORTANT: Tell gif.js where to find its worker!
+    window.GIF.workerScript = 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js';
+
     // DOM refs
     const fileInput          = document.getElementById('fileInput');
     const fileNameInput      = document.getElementById('fileNameInput');
@@ -98,6 +101,7 @@
     const DEFAULT_FRAME_COUNT   = 15;
     const DEFAULT_SCALE_PERCENT = 50;
     const DEFAULT_STATUS        = 'Waiting…';
+    const MAX_FILE_SIZE         = 30 * 1024 * 1024; // 30MB
 
     let fileType = null, fileData = null, lottieData = null, gifFrames = null, videoElement = null;
 
@@ -125,6 +129,13 @@
       resetAll();
       const file = fileInput.files[0];
       if (!file) return;
+
+      // --- 30MB LIMIT ---
+      if (file.size > MAX_FILE_SIZE) {
+        alert("File is too large! Please select a file under 30 MB.");
+        fileInput.value = "";
+        return;
+      }
 
       // Show progress bar and status
       progressWrap.style.display = 'block';
