@@ -7,10 +7,9 @@ This repository hosts a simple web app by **Abdul Rehman Khan** that converts an
 The app is served directly from GitHub Pages at:
 
 ```
-https://<YOUR_GITHUB_USERNAME>.github.io/<REPO_NAME>/
-```
+https://developerark1992.github.io/giftolottie/)
 
-Replace `<YOUR_GITHUB_USERNAME>` and `<REPO_NAME>` with your details.
+
 
 ## Files to Upload
 
