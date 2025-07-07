@@ -122,57 +122,100 @@
     }
 
     // File upload handler
-    fileInput.addEventListener('change', async () => {
-      resetAll();
-      const file = fileInput.files[0];
-      if (!file) return;
-      const ext = file.name.split('.').pop().toLowerCase();
-      fileType = ext;
+   fileInput.addEventListener('change', async () => {
+  resetAll();
+  const file = fileInput.files[0];
+  if (!file) return;
 
-      if (ext === 'gif') {
-        gifPreview.src = URL.createObjectURL(file);
-        gifPreview.style.display = 'block';
-        fileData = file;
-        toLottieBtn.disabled = false;
-        toVideoBtn.disabled = false;
-        // GIF preview & frame extraction for conversion
-        const buf = await file.arrayBuffer();
-        const parsed = parseGIF(buf);
-        gifFrames = decompressFrames(parsed, true);
-        toGifBtn.disabled = true; // Already a GIF!
-      }
-      else if (ext === 'json') {
-        // Load & preview Lottie
-        const json = await file.text();
-        lottieData = JSON.parse(json);
-        lottieContainer.style.display = 'block';
-        lottie.loadAnimation({
-          container: lottieContainer,
-          renderer: 'svg',
-          loop: true,
-          autoplay: true,
-          animationData: lottieData
-        });
-        toGifBtn.disabled = false;
-        toVideoBtn.disabled = false;
-        toLottieBtn.disabled = true; // Already a Lottie!
-        fileData = lottieData;
-      }
-      else if (ext === 'mp4' || ext === 'webm') {
-        videoPreview.src = URL.createObjectURL(file);
-        videoPreview.style.display = 'block';
-        fileData = file;
-        videoPreview.onloadedmetadata = () => {
-          videoElement = videoPreview;
-          toGifBtn.disabled = false;      // Now ready to convert to GIF
-          toVideoBtn.disabled = true;     // Not needed (video to video)
-          toLottieBtn.disabled = true;    // Not practical for arbitrary video
-        };
-      }
-      else {
-        alert('Unsupported file type.');
-      }
+  // Show and reset progress bar
+  progressWrap.style.display = 'block';
+  progressBar.value = 10;
+  statusText.textContent = 'Uploading...';
+
+  // Simulate progress while reading file (local)
+  await new Promise(res => setTimeout(res, 200)); // Short pause
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  fileType = ext;
+
+  // This will show the upload is "in progress"
+  progressBar.value = 40;
+
+  // Small async delay for better user feedback
+  await new Promise(res => setTimeout(res, 250)); // Short pause
+
+  if (ext === 'gif') {
+    gifPreview.src = URL.createObjectURL(file);
+    gifPreview.style.display = 'block';
+    fileData = file;
+    toLottieBtn.disabled = true;
+    toVideoBtn.disabled = true;
+    toGifBtn.disabled = true;
+
+    // Extract frames (simulate longer process)
+    const buf = await file.arrayBuffer();
+    progressBar.value = 60;
+    statusText.textContent = 'Processing GIF...';
+
+    const parsed = parseGIF(buf);
+    gifFrames = decompressFrames(parsed, true);
+
+    progressBar.value = 100;
+    statusText.textContent = 'Ready!';
+    toLottieBtn.disabled = false;
+    toVideoBtn.disabled = false;
+    // toGifBtn stays disabled for GIF
+  }
+  else if (ext === 'json') {
+    // Load & preview Lottie
+    const json = await file.text();
+    progressBar.value = 60;
+    statusText.textContent = 'Processing Lottie...';
+
+    lottieData = JSON.parse(json);
+    lottieContainer.style.display = 'block';
+    lottie.loadAnimation({
+      container: lottieContainer,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      animationData: lottieData
     });
+
+    progressBar.value = 100;
+    statusText.textContent = 'Ready!';
+    toGifBtn.disabled = false;
+    toVideoBtn.disabled = false;
+    toLottieBtn.disabled = true;
+    fileData = lottieData;
+  }
+  else if (ext === 'mp4' || ext === 'webm') {
+    videoPreview.src = URL.createObjectURL(file);
+    videoPreview.style.display = 'block';
+    fileData = file;
+    toGifBtn.disabled = true;
+    toVideoBtn.disabled = true;
+    toLottieBtn.disabled = true;
+    progressBar.value = 60;
+    statusText.textContent = 'Processing video...';
+
+    // Only enable conversion once video metadata is loaded
+    videoPreview.onloadedmetadata = () => {
+      videoElement = videoPreview;
+      progressBar.value = 100;
+      statusText.textContent = 'Ready!';
+      toGifBtn.disabled = false;
+      toVideoBtn.disabled = true;
+      toLottieBtn.disabled = true;
+    };
+  }
+  else {
+    progressBar.value = 0;
+    statusText.textContent = 'Unsupported file type!';
+    alert('Unsupported file type.');
+  }
+});
+
 
     // GIF to Lottie
     toLottieBtn.addEventListener('click', async () => {
