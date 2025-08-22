@@ -37,7 +37,7 @@
 </head>
 <body>
 <div class="card">
-  <h2>Animation Converter - GIF & Lottie</h2>
+  <h2>Animation Converter - GIF & Lottie - 2025</h2>
 
   <div class="section row">
     <input type="file" id="fileInput" accept=".gif,.mp4,.webm,.json,.mov,.avi,.mkv" />
@@ -62,6 +62,13 @@
   </div>
 
   <div class="section row">
+    <label><input type="checkbox" id="removeBlack" checked /> Remove black background (GIF sources)</label>
+    <label>Threshold:
+      <input type="number" id="removeBlackThresh" value="28" min="0" max="128" />
+    </label>
+  </div>
+
+  <div class="section row">
     <button id="toGifBtn" disabled>Convert to GIF (1-bit alpha)</button>
     <button id="toLottieBtn" disabled>Convert to Lottie (transparent)</button>
     <button id="toVideoBtn" disabled>Convert to WebM (alpha)</button>
@@ -82,7 +89,7 @@
 
   <div class="footer">
     Created by Abdul Rehman Khan —
-    <a href="https://www.linkedin.com/in/developerark/" target="_blank">LinkedIn Profile</a>
+    <a href="https://www.linkedin.com/in/developerark/" target="_blank" rel="noopener">LinkedIn Profile</a>
   </div>
 </div>
 
@@ -95,6 +102,9 @@
   const frameCountInput = document.getElementById('frameCountInput');
   const scaleInput      = document.getElementById('scaleInput');
   const gifChromaSelect = document.getElementById('gifChromaSelect');
+
+  const removeBlack     = document.getElementById('removeBlack');
+  const removeBlackThresh = document.getElementById('removeBlackThresh');
 
   const toGifBtn        = document.getElementById('toGifBtn');
   const toLottieBtn     = document.getElementById('toLottieBtn');
@@ -170,8 +180,8 @@
         gifPreview.src = URL.createObjectURL(file);
         gifPreview.style.display = 'block';
         toGifBtn.disabled = true;
-        toLottieBtn.disabled = false;  // GIF -> Lottie (transparent)
-        toVideoBtn.disabled = false;   // GIF -> WebM (alpha)
+        toLottieBtn.disabled = false;  // GIF -> Lottie (transparent via key)
+        toVideoBtn.disabled = false;   // GIF -> WebM (alpha via key)
 
         const buf = await file.arrayBuffer();
         statusText.textContent = 'Processing GIF...';
@@ -184,7 +194,6 @@
       } else if (ext === 'json') {
         const jsonText = await file.text();
         lottieData = JSON.parse(jsonText);
-
         previewLottie(lottieData);
 
         toGifBtn.disabled = false;     // Lottie -> GIF (chroma)
@@ -234,18 +243,24 @@
 
   // ---- Buttons ----
 
-  // GIF → Lottie (transparent)
+  // GIF → Lottie (transparent by removing black)
   toLottieBtn.addEventListener('click', async () => {
     try {
       if (fileType === 'gif' && gifFrames) {
         progressWrap.style.display = 'block';
         progressBar.value = 0;
-        statusText.textContent = 'Building Lottie (transparent)...';
+        statusText.textContent = 'Building Lottie (removing black background)...';
 
         const total = parseInt(frameCountInput.value, 10);
         const scale = parseFloat(scaleInput.value) / 100;
 
-        const lottieJson = await buildLottieFromGif(gifFrames, total, scale, p => { progressBar.value = p * 100; });
+        const lottieJson = await buildLottieFromGif(
+          gifFrames,
+          total,
+          scale,
+          p => { progressBar.value = p * 100; },
+          removeBlack.checked ? parseInt(removeBlackThresh.value, 10) : null
+        );
         lottieData = lottieJson;
 
         previewLottie(lottieData);
@@ -279,13 +294,11 @@
         progressBar.value = 0;
         statusText.textContent = 'Rendering Lottie frames...';
 
-        // Render frames with true alpha
         const rawFrames = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));
 
-        // Composite each frame over a chroma color (for 1-bit transparency in GIF)
         const chromaHex = gifChromaSelect.value;
         const chroma = hexToNumber(chromaHex);
-        const gifFramesPrepared = prepareFramesForGif(rawFrames, chromaHex); // returns canvases
+        const gifFramesPrepared = prepareFramesForGif(rawFrames, chromaHex); // canvases
 
         statusText.textContent = 'Encoding GIF (1-bit alpha)...';
 
@@ -299,17 +312,12 @@
         });
 
         gifFramesPrepared.forEach(f => gif.addFrame(f, { delay: 100 }));
-
-        gif.on('progress', p => {
-          progressBar.value = Math.round(p * 100);
-        });
-
+        gif.on('progress', p => { progressBar.value = Math.round(p * 100); });
         gif.on('finished', blob => {
           gifPreview.src = URL.createObjectURL(blob);
           gifPreview.style.display = 'block';
           progressBar.value = 100;
           statusText.textContent = 'GIF ready! Download starting...';
-
           autoDownload(blob, (fileNameInput.value || 'animation') + '.gif');
         });
 
@@ -329,7 +337,7 @@
     }
   });
 
-  // GIF/Lottie → WebM (VP9 with alpha)
+  // GIF/Lottie → WebM (VP9 with alpha). If source is GIF, remove black first.
   toVideoBtn.addEventListener('click', async () => {
     try {
       if ((fileType === 'gif' && gifFrames) || (fileType === 'json' && lottieData)) {
@@ -340,9 +348,13 @@
         let framesToRecord;
 
         if (fileType === 'gif') {
-          framesToRecord = await renderGifFramesToCanvas(gifFrames, parseInt(frameCountInput.value, 10)); // preserves alpha
+          framesToRecord = await renderGifFramesToCanvas(
+            gifFrames,
+            parseInt(frameCountInput.value, 10),
+            removeBlack.checked ? parseInt(removeBlackThresh.value, 10) : null
+          );
         } else {
-          framesToRecord = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));  // preserves alpha
+          framesToRecord = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));
         }
 
         const videoBlob = await recordCanvasFramesToVideo(framesToRecord, FPS, p => {
@@ -379,7 +391,6 @@
 
   // ---- Helpers ----
 
-  // Preview Lottie (transparent)
   function previewLottie(data) {
     lottieContainer.innerHTML = '';
     lottie.loadAnimation({
@@ -394,8 +405,27 @@
     videoPreview.style.display = 'none';
   }
 
-  // Build Lottie JSON from GIF frames (preserve alpha; correct patch handling)
-  async function buildLottieFromGif(frames, total, scale, onProgress) {
+  // Make near-black pixels fully transparent on a canvas
+  function chromaKeyBlack(canvas, threshold /* 0..128 */) {
+    if (threshold == null) return; // disabled
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    const img = ctx.getImageData(0, 0, width, height);
+    const d = img.data;
+
+    // treat pixel as background if R,G,B all <= threshold
+    const t = Math.max(0, Math.min(255, threshold|0));
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i+1], b = d[i+2];
+      if (r <= t && g <= t && b <= t) {
+        d[i+3] = 0; // alpha -> 0
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // Build Lottie JSON from GIF frames (correct patch handling + optional black removal)
+  async function buildLottieFromGif(frames, total, scale, onProgress, blackThreshold) {
     const origW = frames[0].dims.width, origH = frames[0].dims.height;
     const picks = Array.from({ length: total }, (_, i) => Math.floor(i * frames.length / total));
     const W = Math.floor(origW * scale), H = Math.floor(origH * scale);
@@ -411,18 +441,19 @@
     const images = picks.map((idx, i) => {
       const f = frames[idx];
 
-      // Transparent base each frame
+      // Compose full frame on transparent temp
       tctx.clearRect(0, 0, origW, origH);
-
-      // Correct patch handling
       const pw = f.dims.width, ph = f.dims.height;
       const px = f.dims.left, py = f.dims.top;
       const patchImage = new ImageData(new Uint8ClampedArray(f.patch), pw, ph);
       tctx.putImageData(patchImage, px, py);
 
-      // scale into output canvas, preserve alpha
+      // Scale to output canvas
       ctx.clearRect(0, 0, W, H);
       ctx.drawImage(tmp, 0, 0, origW, origH, 0, 0, W, H);
+
+      // Remove black background if requested
+      chromaKeyBlack(canvas, blackThreshold);
 
       onProgress?.((i + 1) / total);
       return canvas.toDataURL('image/png'); // PNG with alpha
@@ -488,7 +519,6 @@
             frameCanvas.width = W;
             frameCanvas.height = H;
             const fctx = frameCanvas.getContext('2d');
-            // Clear to transparency
             fctx.clearRect(0, 0, W, H);
             fctx.drawImage(sourceCanvas, 0, 0);
             frames.push(frameCanvas);
@@ -501,14 +531,10 @@
     });
   }
 
-  // Render GIF frames to canvases (preserve alpha)
-  async function renderGifFramesToCanvas(frames, totalFrames) {
+  // Render GIF frames to canvases (optional black removal)
+  async function renderGifFramesToCanvas(frames, totalFrames, blackThreshold) {
     const origW = frames[0].dims.width, origH = frames[0].dims.height;
     const picks = Array.from({ length: totalFrames }, (_, i) => Math.floor(i * frames.length / totalFrames));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = origW; canvas.height = origH;
-    const ctx = canvas.getContext('2d');
 
     const tmp = document.createElement('canvas');
     tmp.width = origW; tmp.height = origH;
@@ -517,52 +543,39 @@
     return picks.map(idx => {
       const f = frames[idx];
 
-      // Build the full frame on a transparent temp canvas
+      // Build the full frame on temp
       tctx.clearRect(0, 0, origW, origH);
       const pw = f.dims.width, ph = f.dims.height;
       const px = f.dims.left, py = f.dims.top;
       const patchImage = new ImageData(new Uint8ClampedArray(f.patch), pw, ph);
       tctx.putImageData(patchImage, px, py);
 
-      // Copy to output canvas (transparent preserved)
-      ctx.clearRect(0, 0, origW, origH);
-      ctx.drawImage(tmp, 0, 0);
-
-      // clone to a new canvas to freeze the frame
+      // Freeze into its own canvas
       const frameCanvas = document.createElement('canvas');
       frameCanvas.width = origW;
       frameCanvas.height = origH;
-      frameCanvas.getContext('2d').drawImage(canvas, 0, 0);
+      const fctx = frameCanvas.getContext('2d');
+      fctx.drawImage(tmp, 0, 0);
+
+      // Remove black if requested
+      chromaKeyBlack(frameCanvas, blackThreshold);
+
       return frameCanvas;
     });
   }
 
-  // Convert fully-alpha frames to GIF-ready frames using chroma key fill
+  // Convert fully-alpha frames to GIF-ready frames using chroma fill
   function prepareFramesForGif(alphaFrames, hexColor) {
-    const rgb = hexToRgb(hexColor);
     return alphaFrames.map(src => {
       const c = document.createElement('canvas');
       c.width = src.width;
       c.height = src.height;
       const ctx = c.getContext('2d');
-
-      // Fill entire frame with the chroma color
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = hexColor;
       ctx.fillRect(0, 0, c.width, c.height);
-      ctx.restore();
-
-      // Draw the image on top (any transparent pixels leave chroma showing)
       ctx.drawImage(src, 0, 0);
       return c;
     });
-  }
-
-  function hexToRgb(hex) {
-    const h = hex.replace('#','');
-    const bigint = parseInt(h, 16);
-    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
   }
 
   // Record canvas frames to WebM video blob (tries VP9 for alpha)
@@ -577,8 +590,6 @@
 
       const stream = canvas.captureStream(fps);
       let mime = '';
-
-      // Prefer VP9 with alpha
       if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
         mime = 'video/webm;codecs=vp9';
       } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
@@ -613,7 +624,6 @@
           recorder.stop();
           return;
         }
-        // Transparent base each frame
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(frames[i], 0, 0);
         i++;
