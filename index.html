@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Animation Converter - GIF & Lottie</title>
 <link rel="icon" type="image/png" href="favicon.png" />
+<meta name="description" content="Convert between GIF, Lottie (JSON), and WebM with alpha transparency. All scripts self-hosted." />
 <style>
   body { background:#121212; color:#e0e0e0; font-family:'Segoe UI',sans-serif; padding:2rem; margin:0; display:flex; justify-content:center; }
   .card { background:#1e1e1e; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); padding:2rem; width:90%; max-width:700px }
@@ -82,13 +83,20 @@
 
   <div class="footer">
     Created by Abdul Rehman Khan —
-    <a href="https://www.linkedin.com/in/developerark/" target="_blank">LinkedIn Profile</a>
+    <a href="https://www.linkedin.com/in/developerark/" target="_blank" rel="noopener">LinkedIn Profile</a>
   </div>
 </div>
 
+<!-- UMD globals (no network): lottie + gif.js -->
+<script src="./vendor/lottie-web/lottie.min.js"></script>
+<script src="./vendor/gif.js/gif.min.js"></script>
+
+<!-- App (ESM) -->
 <script type="module">
-  import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
-  import lottie from 'https://esm.sh/lottie-web';
+  import { parseGIF, decompressFrames } from './vendor/gifuct-js/gifuct-esm.js';
+
+  const lottie = window.lottie; // UMD global
+  const GIF = window.GIF;       // UMD global
 
   const fileInput       = document.getElementById('fileInput');
   const fileNameInput   = document.getElementById('fileNameInput');
@@ -113,14 +121,6 @@
   const FPS = 30;
 
   let fileType = null, fileData = null, lottieData = null, gifFrames = null;
-
-  // === Load GIF.js encoder with readiness guard ===
-  let gifLibReady = false;
-  const gifScript = document.createElement('script');
-  gifScript.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js";
-  gifScript.onload = () => { gifLibReady = true; console.log("GIF.js loaded"); };
-  gifScript.onerror = () => { console.error('Failed to load GIF.js'); };
-  document.head.appendChild(gifScript);
 
   function resetAll() {
     gifPreview.src = '';
@@ -184,7 +184,6 @@
       } else if (ext === 'json') {
         const jsonText = await file.text();
         lottieData = JSON.parse(jsonText);
-
         previewLottie(lottieData);
 
         toGifBtn.disabled = false;     // Lottie -> GIF (chroma)
@@ -226,7 +225,7 @@
     a.remove();
   }
 
-  // Utility: hex color -> GIF.js transparent number (0xRRGGBB)
+  // Utility: hex color -> number for GIF transparent (0xRRGGBB)
   function hexToNumber(hex) {
     const h = hex.replace('#','');
     return parseInt(h, 16) >>> 0;
@@ -270,11 +269,6 @@
   toGifBtn.addEventListener('click', async () => {
     try {
       if (fileType === 'json' && lottieData) {
-        if (!gifLibReady || typeof GIF === 'undefined') {
-          alert('Encoder not ready yet. Please wait a second and try again.');
-          return;
-        }
-
         progressWrap.style.display = 'block';
         progressBar.value = 0;
         statusText.textContent = 'Rendering Lottie frames...';
@@ -285,7 +279,7 @@
         // Composite each frame over a chroma color (for 1-bit transparency in GIF)
         const chromaHex = gifChromaSelect.value;
         const chroma = hexToNumber(chromaHex);
-        const gifFramesPrepared = prepareFramesForGif(rawFrames, chromaHex); // returns canvases
+        const gifFramesPrepared = prepareFramesForGif(rawFrames, chromaHex); // canvases
 
         statusText.textContent = 'Encoding GIF (1-bit alpha)...';
 
@@ -294,22 +288,17 @@
           quality: 10,
           width: gifFramesPrepared[0].width,
           height: gifFramesPrepared[0].height,
-          workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js',
+          workerScript: './vendor/gif.js/gif.worker.js',
           transparent: chroma
         });
 
         gifFramesPrepared.forEach(f => gif.addFrame(f, { delay: 100 }));
-
-        gif.on('progress', p => {
-          progressBar.value = Math.round(p * 100);
-        });
-
+        gif.on('progress', p => { progressBar.value = Math.round(p * 100); });
         gif.on('finished', blob => {
           gifPreview.src = URL.createObjectURL(blob);
           gifPreview.style.display = 'block';
           progressBar.value = 100;
           statusText.textContent = 'GIF ready! Download starting...';
-
           autoDownload(blob, (fileNameInput.value || 'animation') + '.gif');
         });
 
@@ -379,7 +368,6 @@
 
   // ---- Helpers ----
 
-  // Preview Lottie (transparent)
   function previewLottie(data) {
     lottieContainer.innerHTML = '';
     lottie.loadAnimation({
@@ -394,7 +382,7 @@
     videoPreview.style.display = 'none';
   }
 
-  // Build Lottie JSON from GIF frames (preserve alpha; correct patch handling)
+  // Build Lottie JSON from GIF frames (true alpha; correct patch handling)
   async function buildLottieFromGif(frames, total, scale, onProgress) {
     const origW = frames[0].dims.width, origH = frames[0].dims.height;
     const picks = Array.from({ length: total }, (_, i) => Math.floor(i * frames.length / total));
@@ -488,7 +476,6 @@
             frameCanvas.width = W;
             frameCanvas.height = H;
             const fctx = frameCanvas.getContext('2d');
-            // Clear to transparency
             fctx.clearRect(0, 0, W, H);
             fctx.drawImage(sourceCanvas, 0, 0);
             frames.push(frameCanvas);
@@ -506,10 +493,6 @@
     const origW = frames[0].dims.width, origH = frames[0].dims.height;
     const picks = Array.from({ length: totalFrames }, (_, i) => Math.floor(i * frames.length / totalFrames));
 
-    const canvas = document.createElement('canvas');
-    canvas.width = origW; canvas.height = origH;
-    const ctx = canvas.getContext('2d');
-
     const tmp = document.createElement('canvas');
     tmp.width = origW; tmp.height = origH;
     const tctx = tmp.getContext('2d');
@@ -524,45 +507,31 @@
       const patchImage = new ImageData(new Uint8ClampedArray(f.patch), pw, ph);
       tctx.putImageData(patchImage, px, py);
 
-      // Copy to output canvas (transparent preserved)
-      ctx.clearRect(0, 0, origW, origH);
-      ctx.drawImage(tmp, 0, 0);
-
       // clone to a new canvas to freeze the frame
       const frameCanvas = document.createElement('canvas');
       frameCanvas.width = origW;
       frameCanvas.height = origH;
-      frameCanvas.getContext('2d').drawImage(canvas, 0, 0);
+      frameCanvas.getContext('2d').drawImage(tmp, 0, 0);
       return frameCanvas;
     });
   }
 
-  // Convert fully-alpha frames to GIF-ready frames using chroma key fill
+  // Convert alpha frames to GIF-ready frames using chroma key fill
   function prepareFramesForGif(alphaFrames, hexColor) {
-    const rgb = hexToRgb(hexColor);
     return alphaFrames.map(src => {
       const c = document.createElement('canvas');
       c.width = src.width;
       c.height = src.height;
       const ctx = c.getContext('2d');
 
-      // Fill entire frame with the chroma color
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
+      // Fill with chroma color
       ctx.fillStyle = hexColor;
       ctx.fillRect(0, 0, c.width, c.height);
-      ctx.restore();
 
-      // Draw the image on top (any transparent pixels leave chroma showing)
+      // Draw the image on top (transparent pixels leave chroma showing)
       ctx.drawImage(src, 0, 0);
       return c;
     });
-  }
-
-  function hexToRgb(hex) {
-    const h = hex.replace('#','');
-    const bigint = parseInt(h, 16);
-    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
   }
 
   // Record canvas frames to WebM video blob (tries VP9 for alpha)
@@ -577,8 +546,6 @@
 
       const stream = canvas.captureStream(fps);
       let mime = '';
-
-      // Prefer VP9 with alpha
       if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
         mime = 'video/webm;codecs=vp9';
       } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
@@ -613,7 +580,6 @@
           recorder.stop();
           return;
         }
-        // Transparent base each frame
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(frames[i], 0, 0);
         i++;
