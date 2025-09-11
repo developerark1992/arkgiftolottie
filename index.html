@@ -40,13 +40,13 @@
   <h2>Animation Converter - GIF & Lottie - 2025</h2>
 
   <div class="section row">
-    <input type="file" id="fileInput" accept=".gif,.mp4,.webm,.json,.mov,.avi,.mkv" />
+    <input type="file" id="fileInput" accept=".gif,.json,.mp4,.webm,.mov,.avi,.mkv" />
     <input type="text" id="fileNameInput" placeholder="Base filename" value="animation" />
   </div>
 
   <div class="section row">
     <label>Frames:
-      <input type="number" id="frameCountInput" value="15" min="1" max="120" />
+      <input type="number" id="frameCountInput" value="15" min="1" max="240" />
     </label>
     <label>Scale %:
       <input type="number" id="scaleInput" value="50" min="10" max="200" />
@@ -97,41 +97,41 @@
   import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
   import lottie from 'https://esm.sh/lottie-web';
 
+  // ===== Config =====
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+  let sourceFPS = 30; // fallback if unknown
+
+  // ===== DOM =====
   const fileInput       = document.getElementById('fileInput');
   const fileNameInput   = document.getElementById('fileNameInput');
   const frameCountInput = document.getElementById('frameCountInput');
   const scaleInput      = document.getElementById('scaleInput');
   const gifChromaSelect = document.getElementById('gifChromaSelect');
-
   const removeBlack     = document.getElementById('removeBlack');
   const removeBlackThresh = document.getElementById('removeBlackThresh');
-
   const toGifBtn        = document.getElementById('toGifBtn');
   const toLottieBtn     = document.getElementById('toLottieBtn');
   const toVideoBtn      = document.getElementById('toVideoBtn');
   const resetBtn        = document.getElementById('resetBtn');
-
   const progressWrap    = document.getElementById('progressContainer');
   const progressBar     = document.getElementById('progressBar');
   const statusText      = document.getElementById('status');
-
   const gifPreview      = document.getElementById('gifPreview');
   const videoPreview    = document.getElementById('videoPreview');
   const lottieContainer = document.getElementById('lottieContainer');
 
-  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-  const FPS = 30;
+  // ===== State =====
+  let fileType = null, lottieData = null, gifFrames = null;
 
-  let fileType = null, fileData = null, lottieData = null, gifFrames = null;
-
-  // === Load GIF.js encoder with readiness guard ===
+  // Load GIF.js encoder
   let gifLibReady = false;
   const gifScript = document.createElement('script');
   gifScript.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js";
-  gifScript.onload = () => { gifLibReady = true; console.log("GIF.js loaded"); };
-  gifScript.onerror = () => { console.error('Failed to load GIF.js'); };
+  gifScript.onload = () => { gifLibReady = true; };
+  gifScript.onerror = () => console.error('Failed to load GIF.js');
   document.head.appendChild(gifScript);
 
+  // ===== Utils =====
   function resetAll() {
     gifPreview.src = '';
     gifPreview.style.display = 'none';
@@ -139,93 +139,13 @@
     videoPreview.style.display = 'none';
     lottieContainer.innerHTML = '';
     lottieContainer.style.display = 'none';
-
-    toGifBtn.disabled = true;
-    toLottieBtn.disabled = true;
-    toVideoBtn.disabled = true;
-
+    toGifBtn.disabled = true; toLottieBtn.disabled = true; toVideoBtn.disabled = true;
     progressWrap.style.display = 'none';
     progressBar.value = 0;
     statusText.textContent = 'Waiting…';
-
-    fileType = null;
-    fileData = null;
-    gifFrames = null;
-    lottieData = null;
+    fileType = null; lottieData = null; gifFrames = null; sourceFPS = 30;
   }
 
-  fileInput.addEventListener('change', async () => {
-    resetAll();
-    const file = fileInput.files[0];
-    if (!file) return;
-
-    if (file.size > MAX_FILE_SIZE) {
-      alert("File too large! Max 30 MB allowed.");
-      fileInput.value = "";
-      return;
-    }
-
-    const ext = file.name.split('.').pop().toLowerCase();
-    fileType = ext;
-    fileData = file;
-
-    progressWrap.style.display = 'block';
-    progressBar.value = 20;
-    statusText.textContent = 'Uploading...';
-
-    await new Promise(r => setTimeout(r, 150)); // small delay
-
-    try {
-      if (ext === 'gif') {
-        gifPreview.src = URL.createObjectURL(file);
-        gifPreview.style.display = 'block';
-        toGifBtn.disabled = true;
-        toLottieBtn.disabled = false;  // GIF -> Lottie (transparent via key)
-        toVideoBtn.disabled = false;   // GIF -> WebM (alpha via key)
-
-        const buf = await file.arrayBuffer();
-        statusText.textContent = 'Processing GIF...';
-        const parsed = parseGIF(buf);
-        gifFrames = decompressFrames(parsed, true); // includes patch + dims
-
-        progressBar.value = 100;
-        statusText.textContent = 'Ready!';
-
-      } else if (ext === 'json') {
-        const jsonText = await file.text();
-        lottieData = JSON.parse(jsonText);
-        previewLottie(lottieData);
-
-        toGifBtn.disabled = false;     // Lottie -> GIF (chroma)
-        toLottieBtn.disabled = true;
-        toVideoBtn.disabled = false;   // Lottie -> WebM (alpha)
-
-        progressBar.value = 100;
-        statusText.textContent = 'Ready!';
-
-      } else if (['mp4','webm','mov','avi','mkv'].includes(ext)) {
-        videoPreview.src = URL.createObjectURL(file);
-        videoPreview.style.display = 'block';
-
-        toGifBtn.disabled = false;    // will show backend-needed alert
-        toLottieBtn.disabled = false; // will show backend-needed alert
-        toVideoBtn.disabled = true;
-
-        progressBar.value = 100;
-        statusText.textContent = 'Video preview loaded. Video → GIF/Lottie conversion requires backend processing.';
-      } else {
-        alert('Unsupported file type');
-        resetAll();
-        return;
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Failed to load file: ' + (e?.message || e));
-      resetAll();
-    }
-  });
-
-  // Auto-download helper
   function autoDownload(blob, filename) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -235,161 +155,51 @@
     a.remove();
   }
 
-  // Utility: hex color -> GIF.js transparent number (0xRRGGBB)
-  function hexToNumber(hex) {
-    const h = hex.replace('#','');
-    return parseInt(h, 16) >>> 0;
+  function hexToNumber(hex) { return parseInt(hex.replace('#',''), 16) >>> 0; }
+
+  function median(arr) {
+    const a = [...arr].sort((x,y)=>x-y);
+    const mid = Math.floor(a.length/2);
+    return a.length % 2 ? a[mid] : (a[mid-1]+a[mid])/2;
   }
 
-  // ---- Buttons ----
+  // Estimate FPS from GIF frame delays (hundredths of a second)
+  function estimateGifFPS(frames) {
+    const ms = frames.map(f => Math.max(1, (f.delay || 10) * 10)); // default 100ms if missing
+    const med = median(ms);
+    const fps = Math.max(1, Math.min(60, Math.round(1000 / med)));
+    return { fps, delaysMs: ms, totalMs: ms.reduce((a,b)=>a+b,0) };
+  }
 
-  // GIF → Lottie (transparent by removing black)
-  toLottieBtn.addEventListener('click', async () => {
-    try {
-      if (fileType === 'gif' && gifFrames) {
-        progressWrap.style.display = 'block';
-        progressBar.value = 0;
-        statusText.textContent = 'Building Lottie (removing black background)...';
+  // Evenly sample frames + re-aggregate their delays so total duration is preserved
+  function sampleFramesAndDelays(canvases, delaysMs, targetCount) {
+    if (targetCount >= canvases.length) return { frames: canvases.slice(), delays: delaysMs.slice() };
+    const totalMs = delaysMs.reduce((a,b)=>a+b,0);
+    const sliceMs = totalMs / targetCount;
+    const outFrames = [];
+    const outDelays = [];
+    let acc = 0, idx = 0, bucketMs = 0;
 
-        const total = parseInt(frameCountInput.value, 10);
-        const scale = parseFloat(scaleInput.value) / 100;
-
-        const lottieJson = await buildLottieFromGif(
-          gifFrames,
-          total,
-          scale,
-          p => { progressBar.value = p * 100; },
-          removeBlack.checked ? parseInt(removeBlackThresh.value, 10) : null
-        );
-        lottieData = lottieJson;
-
-        previewLottie(lottieData);
-        statusText.textContent = 'Lottie ready! Download starting...';
-
-        const blob = new Blob([JSON.stringify(lottieJson, null, 2)], { type: 'application/json' });
-        autoDownload(blob, (fileNameInput.value || 'animation') + '.json');
-
-      } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
-        alert('Video to Lottie conversion requires backend processing.');
-      } else {
-        alert('Please upload a GIF to convert to Lottie.');
+    for (let i = 0; i < targetCount; i++) {
+      const target = (i + 0.5) * sliceMs; // pick representative time within bucket
+      while (acc + delaysMs[idx] < target && idx < canvases.length - 1) {
+        acc += delaysMs[idx];
+        bucketMs += delaysMs[idx];
+        idx++;
       }
-    } catch (e) {
-      console.error(e);
-      statusText.textContent = 'Error: ' + (e?.message || e);
-      alert('Conversion failed: ' + (e?.message || e));
+      outFrames.push(canvases[idx]);
+      // bucket delay: from current acc to next slice boundary
+      const nextBoundary = (i + 1) * sliceMs;
+      let chunk = Math.max(1, Math.round(nextBoundary - (acc + bucketMs)));
+      outDelays.push(chunk);
+      bucketMs = 0;
     }
-  });
+    // Fix rounding to match totalMs exactly
+    const diff = totalMs - outDelays.reduce((a,b)=>a+b,0);
+    if (diff !== 0) outDelays[outDelays.length-1] += diff;
 
-  // Lottie → GIF (1-bit alpha via chroma key)
-  toGifBtn.addEventListener('click', async () => {
-    try {
-      if (fileType === 'json' && lottieData) {
-        if (!gifLibReady || typeof GIF === 'undefined') {
-          alert('Encoder not ready yet. Please wait a second and try again.');
-          return;
-        }
-
-        progressWrap.style.display = 'block';
-        progressBar.value = 0;
-        statusText.textContent = 'Rendering Lottie frames...';
-
-        const rawFrames = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));
-
-        const chromaHex = gifChromaSelect.value;
-        const chroma = hexToNumber(chromaHex);
-        const gifFramesPrepared = prepareFramesForGif(rawFrames, chromaHex); // canvases
-
-        statusText.textContent = 'Encoding GIF (1-bit alpha)...';
-
-        const gif = new GIF({
-          workers: 2,
-          quality: 10,
-          width: gifFramesPrepared[0].width,
-          height: gifFramesPrepared[0].height,
-          workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js',
-          transparent: chroma
-        });
-
-        gifFramesPrepared.forEach(f => gif.addFrame(f, { delay: 100 }));
-        gif.on('progress', p => { progressBar.value = Math.round(p * 100); });
-        gif.on('finished', blob => {
-          gifPreview.src = URL.createObjectURL(blob);
-          gifPreview.style.display = 'block';
-          progressBar.value = 100;
-          statusText.textContent = 'GIF ready! Download starting...';
-          autoDownload(blob, (fileNameInput.value || 'animation') + '.gif');
-        });
-
-        gif.render();
-
-      } else if (['mp4','webm','mov','avi','mkv'].includes(fileType)) {
-        alert('Video to GIF conversion requires backend processing.');
-      } else if (fileType === 'gif') {
-        alert('You already have a GIF. Use Lottie or WebM export for transparency.');
-      } else {
-        alert('Please upload a Lottie JSON file to convert to GIF.');
-      }
-    } catch (e) {
-      console.error(e);
-      statusText.textContent = 'Error: ' + (e?.message || e);
-      alert('Conversion failed: ' + (e?.message || e));
-    }
-  });
-
-  // GIF/Lottie → WebM (VP9 with alpha). If source is GIF, remove black first.
-  toVideoBtn.addEventListener('click', async () => {
-    try {
-      if ((fileType === 'gif' && gifFrames) || (fileType === 'json' && lottieData)) {
-        progressWrap.style.display = 'block';
-        progressBar.value = 0;
-        statusText.textContent = 'Recording WebM (alpha)...';
-
-        let framesToRecord;
-
-        if (fileType === 'gif') {
-          framesToRecord = await renderGifFramesToCanvas(
-            gifFrames,
-            parseInt(frameCountInput.value, 10),
-            removeBlack.checked ? parseInt(removeBlackThresh.value, 10) : null
-          );
-        } else {
-          framesToRecord = await renderLottieToFrames(lottieData, parseInt(frameCountInput.value, 10));
-        }
-
-        const videoBlob = await recordCanvasFramesToVideo(framesToRecord, FPS, p => {
-          progressBar.value = p * 100;
-        });
-
-        if (videoBlob) {
-          const videoUrl = URL.createObjectURL(videoBlob);
-          videoPreview.src = videoUrl;
-          videoPreview.style.display = 'block';
-          autoDownload(videoBlob, (fileNameInput.value || 'animation') + '.webm');
-          statusText.textContent = 'Video ready! Download starting...';
-        } else {
-          statusText.textContent = 'Video recording failed (codec not supported?).';
-        }
-
-      } else {
-        alert('Upload a GIF or Lottie to convert to video.');
-      }
-    } catch (e) {
-      console.error(e);
-      statusText.textContent = 'Error: ' + (e?.message || e);
-      alert('Conversion failed: ' + (e?.message || e));
-    }
-  });
-
-  resetBtn.addEventListener('click', () => {
-    fileInput.value = '';
-    fileNameInput.value = 'animation';
-    frameCountInput.value = 15;
-    scaleInput.value = 50;
-    resetAll();
-  });
-
-  // ---- Helpers ----
+    return { frames: outFrames, delays: outDelays };
+  }
 
   function previewLottie(data) {
     lottieContainer.innerHTML = '';
@@ -406,82 +216,245 @@
   }
 
   // Make near-black pixels fully transparent on a canvas
-  function chromaKeyBlack(canvas, threshold /* 0..128 */) {
-    if (threshold == null) return; // disabled
+  function chromaKeyBlack(canvas, threshold) {
+    if (threshold == null) return;
     const ctx = canvas.getContext('2d');
     const { width, height } = canvas;
     const img = ctx.getImageData(0, 0, width, height);
     const d = img.data;
-
-    // treat pixel as background if R,G,B all <= threshold
     const t = Math.max(0, Math.min(255, threshold|0));
     for (let i = 0; i < d.length; i += 4) {
       const r = d[i], g = d[i+1], b = d[i+2];
-      if (r <= t && g <= t && b <= t) {
-        d[i+3] = 0; // alpha -> 0
-      }
+      if (r <= t && g <= t && b <= t) d[i+3] = 0;
     }
     ctx.putImageData(img, 0, 0);
   }
 
-  // Build Lottie JSON from GIF frames (correct patch handling + optional black removal)
-  async function buildLottieFromGif(frames, total, scale, onProgress, blackThreshold) {
-    const origW = frames[0].dims.width, origH = frames[0].dims.height;
-    const picks = Array.from({ length: total }, (_, i) => Math.floor(i * frames.length / total));
-    const W = Math.floor(origW * scale), H = Math.floor(origH * scale);
+  // ===== File Handling =====
+  fileInput.addEventListener('change', async () => {
+    resetAll();
+    const file = fileInput.files[0];
+    if (!file) return;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d');
+    if (file.size > MAX_FILE_SIZE) {
+      alert("File too large! Max 100 MB allowed.");
+      fileInput.value = "";
+      return;
+    }
 
-    const tmp = document.createElement('canvas');
-    tmp.width = origW; tmp.height = origH;
-    const tctx = tmp.getContext('2d');
+    const ext = file.name.split('.').pop().toLowerCase();
+    fileType = ext;
 
-    const images = picks.map((idx, i) => {
-      const f = frames[idx];
+    progressWrap.style.display = 'block';
+    progressBar.value = 20;
+    statusText.textContent = 'Loading...';
 
-      // Compose full frame on transparent temp
-      tctx.clearRect(0, 0, origW, origH);
-      const pw = f.dims.width, ph = f.dims.height;
-      const px = f.dims.left, py = f.dims.top;
-      const patchImage = new ImageData(new Uint8ClampedArray(f.patch), pw, ph);
-      tctx.putImageData(patchImage, px, py);
+    try {
+      if (ext === 'gif') {
+        gifPreview.src = URL.createObjectURL(file);
+        gifPreview.style.display = 'block';
 
-      // Scale to output canvas
-      ctx.clearRect(0, 0, W, H);
-      ctx.drawImage(tmp, 0, 0, origW, origH, 0, 0, W, H);
+        const buf = await file.arrayBuffer();
+        const parsed = parseGIF(buf);
+        const frames = decompressFrames(parsed, true); // includes patch + dims + delay
+        gifFrames = frames;
 
-      // Remove black background if requested
-      chromaKeyBlack(canvas, blackThreshold);
+        const timing = estimateGifFPS(frames);
+        sourceFPS = timing.fps;
 
-      onProgress?.((i + 1) / total);
-      return canvas.toDataURL('image/png'); // PNG with alpha
-    });
+        toLottieBtn.disabled = false;
+        toVideoBtn.disabled = false;
+        toGifBtn.disabled = true; // you already have a GIF
 
-    const assets = images.map((d, i) => ({
-      id: `img_${i}`, w: W, h: H, p: d, e: 1
-    }));
+        progressBar.value = 100;
+        statusText.textContent = `GIF ready (≈${sourceFPS} FPS inferred).`;
 
-    const layers = images.map((_, i) => ({
-      ddd: 0, ind: i + 1, ty: 2, refId: `img_${i}`,
-      ks: {
-        o: { a: 0, k: 100 }, r: { a: 0, k: 0 },
-        p: { a: 0, k: [W / 2, H / 2, 0] },
-        a: { a: 0, k: [W / 2, H / 2, 0] },
-        s: { a: 0, k: [100, 100, 100] }
-      },
-      ip: i, op: i + 1, st: 0, bm: 0
-    }));
+      } else if (ext === 'json') {
+        const jsonText = await file.text();
+        lottieData = JSON.parse(jsonText);
+        sourceFPS = lottieData.fr || 30;
+        previewLottie(lottieData);
 
-    return {
-      v: "5.7.4", fr: FPS, ip: 0, op: images.length,
-      w: W, h: H, nm: "Transparent Lottie", ddd: 0,
-      assets, layers
-    };
-  }
+        toGifBtn.disabled = false;
+        toLottieBtn.disabled = true;
+        toVideoBtn.disabled = false;
 
-  // Render Lottie frames to canvases (preserve alpha)
+        progressBar.value = 100;
+        statusText.textContent = `Lottie ready (${sourceFPS} FPS).`;
+
+      } else if (['mp4','webm','mov','avi','mkv'].includes(ext)) {
+        // Frontend preview only; conversion requires backend for videos
+        videoPreview.src = URL.createObjectURL(file);
+        videoPreview.style.display = 'block';
+
+        toGifBtn.disabled = true;
+        toLottieBtn.disabled = true;
+        toVideoBtn.disabled = true;
+
+        progressBar.value = 100;
+        statusText.textContent = 'Video preview loaded. Video → GIF/Lottie needs backend.';
+      } else {
+        alert('Unsupported file type');
+        resetAll();
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to load file: ' + (e?.message || e));
+      resetAll();
+    }
+  });
+
+  // ===== Conversion Buttons =====
+
+  // Lottie → GIF (preserve FR as constant delay)
+  toGifBtn.addEventListener('click', async () => {
+    try {
+      if (fileType !== 'json' || !lottieData) return;
+      if (!gifLibReady || typeof GIF === 'undefined') {
+        alert('Encoder not ready yet. Try again.'); return;
+      }
+
+      progressWrap.style.display = 'block';
+      progressBar.value = 0;
+      statusText.textContent = 'Rendering Lottie frames...';
+
+      const totalFrames = parseInt(frameCountInput.value, 10);
+      const rawFrames = await renderLottieToFrames(lottieData, totalFrames);
+
+      const chromaHex = gifChromaSelect.value;
+      const chroma = hexToNumber(chromaHex);
+      const gifFramesPrepared = prepareFramesForGif(rawFrames, chromaHex);
+
+      const frameDelayMs = Math.max(10, Math.round(1000 / (lottieData.fr || 30))); // ms per frame
+
+      statusText.textContent = 'Encoding GIF (1-bit alpha)...';
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        width: gifFramesPrepared[0].width,
+        height: gifFramesPrepared[0].height,
+        workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js',
+        transparent: chroma
+      });
+
+      gifFramesPrepared.forEach(f => gif.addFrame(f, { delay: frameDelayMs }));
+      gif.on('progress', p => { progressBar.value = Math.round(p * 100); });
+      gif.on('finished', blob => {
+        gifPreview.src = URL.createObjectURL(blob);
+        gifPreview.style.display = 'block';
+        progressBar.value = 100;
+        statusText.textContent = 'GIF ready! Downloading...';
+        autoDownload(blob, (fileNameInput.value || 'animation') + '.gif');
+      });
+
+      gif.render();
+
+    } catch (e) {
+      console.error(e);
+      statusText.textContent = 'Error: ' + (e?.message || e);
+      alert('Conversion failed: ' + (e?.message || e));
+    }
+  });
+
+  // GIF → Lottie (preserve timing by frame durations)
+  toLottieBtn.addEventListener('click', async () => {
+    try {
+      if (fileType !== 'gif' || !gifFrames) return;
+
+      progressWrap.style.display = 'block';
+      progressBar.value = 0;
+      statusText.textContent = 'Building Lottie...';
+
+      const desired = parseInt(frameCountInput.value, 10);
+      const scale = parseFloat(scaleInput.value) / 100;
+
+      const { lottieJson } = await buildLottieFromGifTimed(
+        gifFrames,
+        desired,
+        scale,
+        removeBlack.checked ? parseInt(removeBlackThresh.value, 10) : null,
+        p => { progressBar.value = Math.round(p * 100); }
+      );
+
+      previewLottie(lottieJson);
+      statusText.textContent = 'Lottie ready! Downloading...';
+      const blob = new Blob([JSON.stringify(lottieJson, null, 2)], { type: 'application/json' });
+      autoDownload(blob, (fileNameInput.value || 'animation') + '.json');
+
+    } catch (e) {
+      console.error(e);
+      statusText.textContent = 'Error: ' + (e?.message || e);
+      alert('Conversion failed: ' + (e?.message || e));
+    }
+  });
+
+  // GIF/Lottie → WebM (preserve per-frame delays)
+  toVideoBtn.addEventListener('click', async () => {
+    try {
+      progressWrap.style.display = 'block';
+      progressBar.value = 0;
+      statusText.textContent = 'Recording WebM...';
+
+      let frames = [];
+      let delays = [];
+
+      if (fileType === 'gif' && gifFrames) {
+        // Render full-res canvases for each original frame
+        const canvases = await renderGifFramesToCanvasAll(gifFrames,
+          removeBlack.checked ? parseInt(removeBlackThresh.value, 10) : null);
+
+        // Use original delays (ms)
+        const origDelays = gifFrames.map(f => Math.max(1, (f.delay || 10) * 10));
+
+        // Downsample if needed, redistributing delays
+        const desired = parseInt(frameCountInput.value, 10);
+        const sampled = sampleFramesAndDelays(canvases, origDelays, desired);
+        frames = sampled.frames;
+        delays = sampled.delays;
+
+      } else if (fileType === 'json' && lottieData) {
+        const desired = parseInt(frameCountInput.value, 10);
+        frames = await renderLottieToFrames(lottieData, desired);
+        const perFrame = Math.max(10, Math.round(1000 / (lottieData.fr || 30)));
+        delays = Array(frames.length).fill(perFrame);
+      } else {
+        alert('Upload a GIF or Lottie first.');
+        return;
+      }
+
+      const videoBlob = await recordFramesToWebM(frames, delays, p => {
+        progressBar.value = Math.round(p * 100);
+      });
+
+      if (videoBlob) {
+        const videoUrl = URL.createObjectURL(videoBlob);
+        videoPreview.src = videoUrl;
+        videoPreview.style.display = 'block';
+        autoDownload(videoBlob, (fileNameInput.value || 'animation') + '.webm');
+        statusText.textContent = 'Video ready! Downloading...';
+      } else {
+        statusText.textContent = 'Video recording failed (codec not supported?).';
+      }
+
+    } catch (e) {
+      console.error(e);
+      statusText.textContent = 'Error: ' + (e?.message || e);
+      alert('Conversion failed: ' + (e?.message || e));
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    fileInput.value = '';
+    fileNameInput.value = 'animation';
+    frameCountInput.value = 15;
+    scaleInput.value = 50;
+    resetAll();
+  });
+
+  // ===== Rendering & Building =====
+
+  // Lottie → canvases (alpha preserved)
   async function renderLottieToFrames(data, totalFrames) {
     return new Promise(resolve => {
       const frames = [];
@@ -494,7 +467,7 @@
       document.body.appendChild(container);
 
       const anim = lottie.loadAnimation({
-        container: container,
+        container,
         renderer: 'canvas',
         loop: false,
         autoplay: false,
@@ -503,7 +476,7 @@
 
       anim.addEventListener('DOMLoaded', () => {
         anim.goToAndStop(0, true);
-        const step = anim.totalFrames / totalFrames;
+        const step = Math.max(1, anim.totalFrames / totalFrames);
         let i = 0;
 
         function grab() {
@@ -524,47 +497,101 @@
             frames.push(frameCanvas);
             i++;
             grab();
-          }, 40);
+          }, 30);
         }
         grab();
       });
     });
   }
 
-  // Render GIF frames to canvases (optional black removal)
-  async function renderGifFramesToCanvas(frames, totalFrames, blackThreshold) {
+  // GIF → canvases for ALL frames (optional black removal)
+  async function renderGifFramesToCanvasAll(frames, blackThreshold) {
     const origW = frames[0].dims.width, origH = frames[0].dims.height;
-    const picks = Array.from({ length: totalFrames }, (_, i) => Math.floor(i * frames.length / totalFrames));
-
     const tmp = document.createElement('canvas');
     tmp.width = origW; tmp.height = origH;
     const tctx = tmp.getContext('2d');
 
-    return picks.map(idx => {
-      const f = frames[idx];
-
-      // Build the full frame on temp
+    return frames.map(f => {
       tctx.clearRect(0, 0, origW, origH);
-      const pw = f.dims.width, ph = f.dims.height;
-      const px = f.dims.left, py = f.dims.top;
-      const patchImage = new ImageData(new Uint8ClampedArray(f.patch), pw, ph);
-      tctx.putImageData(patchImage, px, py);
+      const patchImage = new ImageData(new Uint8ClampedArray(f.patch), f.dims.width, f.dims.height);
+      tctx.putImageData(patchImage, f.dims.left, f.dims.top);
 
-      // Freeze into its own canvas
       const frameCanvas = document.createElement('canvas');
       frameCanvas.width = origW;
       frameCanvas.height = origH;
       const fctx = frameCanvas.getContext('2d');
       fctx.drawImage(tmp, 0, 0);
 
-      // Remove black if requested
       chromaKeyBlack(frameCanvas, blackThreshold);
-
       return frameCanvas;
     });
   }
 
-  // Convert fully-alpha frames to GIF-ready frames using chroma fill
+  // GIF → Lottie (preserving timing). We create one image-layer per sampled frame with ip/op covering its duration.
+  async function buildLottieFromGifTimed(frames, desiredCount, scale, blackThreshold, onProgress) {
+    const origW = frames[0].dims.width, origH = frames[0].dims.height;
+    const delaysMs = frames.map(f => Math.max(1, (f.delay || 10) * 10));
+    const totalMs = delaysMs.reduce((a,b)=>a+b,0);
+
+    // Choose a sensible Lottie framerate from GIF: use median delay
+    const med = median(delaysMs);
+    const fr = Math.max(1, Math.min(60, Math.round(1000 / med)));
+    sourceFPS = fr;
+
+    // Render all original canvases, then downsample with preserved timing buckets
+    const allCanvases = await renderGifFramesToCanvasAll(frames, blackThreshold);
+    const { frames: sampledFrames, delays: sampledDelays } =
+      sampleFramesAndDelays(allCanvases, delaysMs, desiredCount);
+
+    // Scale and turn canvases into PNG data URLs
+    const scaledW = Math.max(1, Math.floor(origW * scale));
+    const scaledH = Math.max(1, Math.floor(origH * scale));
+    const work = document.createElement('canvas');
+    work.width = scaledW; work.height = scaledH;
+    const wctx = work.getContext('2d');
+
+    const images = sampledFrames.map((src, i) => {
+      wctx.clearRect(0,0,scaledW,scaledH);
+      wctx.drawImage(src, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
+      onProgress?.((i+1)/sampledFrames.length);
+      return work.toDataURL('image/png'); // PNG with alpha
+    });
+
+    // Map delays to Lottie frame spans
+    // duration in Lottie frames per sampled frame
+    const framesPer = sampledDelays.map(ms => Math.max(1, Math.round((ms/1000) * fr)));
+    const ipList = [];
+    const opList = [];
+    let cursor = 0;
+    framesPer.forEach(sp => {
+      ipList.push(cursor);
+      const op = cursor + sp;
+      opList.push(op);
+      cursor = op;
+    });
+
+    const assets = images.map((d, i) => ({ id: `img_${i}`, w: scaledW, h: scaledH, p: d, e: 1 }));
+    const layers = images.map((_, i) => ({
+      ddd: 0, ind: i + 1, ty: 2, refId: `img_${i}`,
+      ks: {
+        o: { a: 0, k: 100 }, r: { a: 0, k: 0 },
+        p: { a: 0, k: [scaledW/2, scaledH/2, 0] },
+        a: { a: 0, k: [scaledW/2, scaledH/2, 0] },
+        s: { a: 0, k: [100, 100, 100] }
+      },
+      ip: ipList[i], op: opList[i], st: 0, bm: 0
+    }));
+
+    const lottieJson = {
+      v: "5.7.4", fr, ip: 0, op: cursor,
+      w: scaledW, h: scaledH, nm: "Transparent Lottie (timed)", ddd: 0,
+      assets, layers
+    };
+
+    return { lottieJson, totalMs, fr };
+  }
+
+  // Convert alpha frames to GIF-ready by filling chroma color
   function prepareFramesForGif(alphaFrames, hexColor) {
     return alphaFrames.map(src => {
       const c = document.createElement('canvas');
@@ -578,9 +605,9 @@
     });
   }
 
-  // Record canvas frames to WebM video blob (tries VP9 for alpha)
-  async function recordCanvasFramesToVideo(frames, fps, onProgress) {
-    return new Promise((resolve) => {
+  // Record frames to WebM honoring per-frame delays (ms)
+  async function recordFramesToWebM(frames, delaysMs, onProgress) {
+    return new Promise(resolve => {
       if (!frames || !frames.length) return resolve(null);
 
       const canvas = document.createElement('canvas');
@@ -588,21 +615,15 @@
       canvas.height = frames[0].height;
       const ctx = canvas.getContext('2d', { alpha: true });
 
-      const stream = canvas.captureStream(fps);
-      let mime = '';
-      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-        mime = 'video/webm;codecs=vp9';
-      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-        mime = 'video/webm;codecs=vp8';
-      } else if (MediaRecorder.isTypeSupported('video/webm')) {
+      // Try VP9 first for alpha; fall back to generic webm
+      let mime = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mime)) {
         mime = 'video/webm';
-      } else {
-        alert('MediaRecorder WebM not supported in this browser.');
-        return resolve(null);
       }
-
       let recorder;
       try {
+        // Capture at a high FPS; we'll advance frames using delays
+        const stream = canvas.captureStream(60);
         recorder = new MediaRecorder(stream, { mimeType: mime });
       } catch (e) {
         console.error('MediaRecorder init failed:', e);
@@ -618,23 +639,28 @@
 
       let i = 0;
       const total = frames.length;
+      const totalMs = delaysMs.reduce((a,b)=>a+b,0);
+      let elapsed = 0;
 
-      function drawFrame() {
+      const drawNext = () => {
         if (i >= total) {
           recorder.stop();
           return;
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(frames[i], 0, 0);
-        i++;
-        onProgress?.(i / total);
-        setTimeout(drawFrame, 1000 / fps);
-      }
 
-      drawFrame();
+        elapsed += delaysMs[i];
+        onProgress?.(elapsed / totalMs);
+
+        const delay = Math.max(1, delaysMs[i]);
+        i++;
+        setTimeout(drawNext, delay);
+      };
+
+      drawNext();
     });
   }
 </script>
 </body>
 </html>
-
