@@ -35,10 +35,10 @@
 </head>
 <body>
 <div class="card">
-  <h2>Animation Converter - GIF & Lottie - 2025</h2>
+  <h2>ARK Animation Converter - GIF & Lottie - 2025</h2>
 
   <div class="section row">
-    <input type="file" id="fileInput" accept=".gif,.json,.mp4,.webm,.mov,.avi,.mkv" />
+    <input type="file" id="fileInput" accept=".gif,.json" />
     <input type="text" id="fileNameInput" placeholder="Base filename" value="animation" />
   </div>
 
@@ -100,9 +100,6 @@ const toGifBtn = document.getElementById('toGifBtn');
 const toLottieBtn = document.getElementById('toLottieBtn');
 const toVideoBtn = document.getElementById('toVideoBtn');
 const resetBtn = document.getElementById('resetBtn');
-const progressWrap = document.getElementById('progressContainer');
-const progressBar = document.getElementById('progressBar');
-const statusText = document.getElementById('status');
 const gifPreview = document.getElementById('gifPreview');
 const videoPreview = document.getElementById('videoPreview');
 const lottieContainer = document.getElementById('lottieContainer');
@@ -121,8 +118,6 @@ function resetAll() {
   videoPreview.style.display = 'none';
   lottieContainer.style.display = 'none';
   toGifBtn.disabled = true; toLottieBtn.disabled = true; toVideoBtn.disabled = true;
-  progressWrap.style.display = 'none'; progressBar.value = 0;
-  statusText.textContent = 'Waiting…';
   gifFrames = null; lottieData = null; fileType = null;
 }
 
@@ -157,12 +152,10 @@ fileInput.addEventListener('change', async () => {
     const buf = await file.arrayBuffer();
     gifFrames = decompressFrames(parseGIF(buf), true);
     toLottieBtn.disabled = false; toVideoBtn.disabled = false;
-    statusText.textContent = "GIF ready";
   } else if (ext === 'json') {
     lottieData = JSON.parse(await file.text());
     previewLottie(lottieData);
     toGifBtn.disabled = false; toVideoBtn.disabled = false;
-    statusText.textContent = "Lottie ready";
   }
 });
 
@@ -195,7 +188,7 @@ toGifBtn.addEventListener('click', async () => {
   gif.render();
 });
 
-// GIF → Lottie
+// GIF → Lottie (preserve timing)
 toLottieBtn.addEventListener('click', async () => {
   if (!gifFrames) return;
   const lottieJson = await buildLottieFromGif(gifFrames);
@@ -203,12 +196,12 @@ toLottieBtn.addEventListener('click', async () => {
   autoDownload(new Blob([JSON.stringify(lottieJson,null,2)],{type:'application/json'}),(fileNameInput.value||'animation')+'.json');
 });
 
-// GIF/Lottie → WebM
+// GIF/Lottie → WebM (preserve timing)
 toVideoBtn.addEventListener('click', async () => {
   let frames=[], delays=[];
   if (gifFrames) {
     frames = renderGifCanvases(gifFrames);
-    delays = gifFrames.map(f=>Math.max(20,(f.delay||10)*10));
+    delays = gifFrames.map(f=>(f.delay||10)*10);
   } else if (lottieData) {
     frames = await renderLottieFrames(lottieData);
     delays = Array(frames.length).fill(Math.round(1000/(lottieData.fr||30)));
@@ -237,8 +230,8 @@ function renderGifCanvases(frames){
 async function buildLottieFromGif(frames){
   const w=frames[0].dims.width,h=frames[0].dims.height;
   const canvases=renderGifCanvases(frames);
-  const delays=frames.map(f=>Math.max(20,(f.delay||10)*10));
-  const fr=Math.round(1000/median(delays));
+  const delays=frames.map(f=>(f.delay||10)*10);
+  const fr=30; // logical frame rate
   let time=0; const assets=[], layers=[];
   canvases.forEach((c,i)=>{
     const data=c.toDataURL('image/png');
@@ -293,12 +286,6 @@ async function recordFramesToWebM(frames,delays){
       setTimeout(draw,delays[i]);i++;
     }draw();
   });
-}
-
-function median(arr) {
-  const a = [...arr].sort((x,y)=>x-y);
-  const mid = Math.floor(a.length/2);
-  return a.length % 2 ? a[mid] : (a[mid-1]+a[mid])/2;
 }
 </script>
 </body>
