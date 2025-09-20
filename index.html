@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GIF ➜ Lottie JSON (Auto/Manual Frames, Final)</title>
+<title>GIF ➜ Lottie JSON (AUTO Lossless by Default)</title>
 <style>
   :root { color-scheme: dark; }
-  body { background:#121212; color:#e0e0e0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; padding:2rem; display:flex; justify-content:center; }
-  .card { width:min(980px, 96vw); background:#1e1e1e; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.45); padding:22px; }
+  body { background:#121212; color:#e0e0e0; font-family: system-ui, -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; margin:0; padding:2rem; display:flex; justify-content:center; }
+  .card { width:min(980px,96vw); background:#1e1e1e; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.45); padding:22px; }
   h2 { margin:.25rem 0 1rem; color:#fafafa }
   h3 { margin:.5rem 0 .6rem }
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center }
@@ -24,13 +24,14 @@
   .pill { padding:.2rem .6rem; border:1px solid #444; border-radius:999px; font-size:.85rem; color:#bbb; }
   .stats { display:flex; gap:16px; flex-wrap:wrap; margin-top:.25rem; }
   .stat { background:#222; border:1px solid #333; border-radius:10px; padding:.4rem .7rem; font-size:.92rem; color:#cfcfcf }
+  details { background:#191919; border:1px solid #2a2a2a; border-radius:10px; padding:10px 12px; }
+  summary { cursor:pointer; color:#cbd5ff; font-weight:600; }
   .subtle { color:#9aa; font-size:.9rem }
-  .disabled { opacity:.6; pointer-events:none; }
 </style>
 </head>
 <body>
   <div class="card">
-    <h2>GIF ➜ Lottie JSON (Single File, Auto/Manual Frames)</h2>
+    <h2>GIF ➜ Lottie JSON (AUTO — Lossless, Same As GIF)</h2>
 
     <div class="section row">
       <input id="fileInput" type="file" accept=".gif" />
@@ -47,78 +48,73 @@
         <div class="stat">Duration: <span id="statDuration">—</span></div>
         <div class="stat">Inferred FPS: <span id="statFps">—</span></div>
         <div class="stat">Size: <span id="statSize">—</span></div>
+        <div class="stat">Mode: <span id="statMode">AUTO • Lossless PNG</span></div>
       </div>
+      <div class="hint">AUTO picks **PNG, no downscale/quantize/decimation** — identical to GIF appearance.</div>
     </div>
 
-    <div class="section">
-      <h3>Frame Strategy</h3>
-      <div class="row">
-        <label>Mode
-          <select id="frameMode">
-            <option value="auto" selected>Auto (smart cap)</option>
-            <option value="max">Limit by Max Frames</option>
-            <option value="fps">Limit by Target FPS</option>
-            <option value="step">Keep every Nth frame</option>
-          </select>
-        </label>
-
-        <label id="maxFramesWrap">Max Frames
-          <input type="number" id="maxFrames" value="300" min="50" step="10" style="width:6rem" />
-        </label>
-
-        <label id="targetFpsWrap" class="disabled">Target FPS
-          <input type="number" id="targetFps" value="20" min="2" max="60" step="1" style="width:6rem" />
-        </label>
-
-        <label id="keepNthWrap" class="disabled">Keep every Nth
-          <input type="number" id="keepNth" value="2" min="2" step="1" style="width:6rem" />
-        </label>
-
-        <span class="pill">Auto chooses a cap based on duration & frames (aims ≤ 300)</span>
-      </div>
-    </div>
-
-    <div class="section">
-      <h3>Output</h3>
-      <div class="row">
-        <label>Embedded Format
-          <select id="embedFormat">
-            <option value="webp" selected>WebP (smaller JSON)</option>
-            <option value="png">PNG (bigger, max compatibility)</option>
-          </select>
-        </label>
-        <label>WebP Quality
-          <input type="number" id="webpQ" value="0.7" min="0" max="1" step="0.05" style="width:6rem" />
-        </label>
-        <label>Target Size (KB)
-          <input type="number" id="targetKB" value="900" min="0" step="50" style="width:7rem" />
-        </label>
-        <span class="pill">>0 auto-tunes WebP to hit target</span>
+    <details class="section">
+      <summary>Advanced (optional)</summary>
+      <div class="section">
+        <h3>Frame Strategy</h3>
+        <div class="row">
+          <label>Mode
+            <select id="frameMode">
+              <option value="auto" selected>Auto (keep all)</option>
+              <option value="max">Limit by Max Frames</option>
+              <option value="fps">Limit by Target FPS</option>
+              <option value="step">Keep every Nth frame</option>
+            </select>
+          </label>
+          <label>Max Frames <input type="number" id="maxFrames" value="300" min="50" step="10" style="width:6rem" /></label>
+          <label>Target FPS <input type="number" id="targetFps" value="20" min="2" max="60" step="1" style="width:6rem" /></label>
+          <label>Keep every Nth <input type="number" id="keepNth" value="2" min="2" step="1" style="width:6rem" /></label>
+          <span class="pill">AUTO keeps all frames (best fidelity)</span>
+        </div>
       </div>
 
-      <div class="row">
-        <label>Max Width <input type="number" id="maxW" value="512" min="16" style="width:6rem" /></label>
-        <label>Max Height <input type="number" id="maxH" value="512" min="16" style="width:6rem" /></label>
-      </div>
+      <div class="section">
+        <h3>Output</h3>
+        <div class="row">
+          <label>Embedded Format
+            <select id="embedFormat">
+              <option value="png" selected>PNG (lossless, max fidelity)</option>
+              <option value="webp">WebP (smaller, lossy)</option>
+            </select>
+          </label>
+          <label>WebP Quality
+            <input type="number" id="webpQ" value="0.75" min="0" max="1" step="0.05" style="width:6rem" />
+          </label>
+          <label>Target Size (KB)
+            <input type="number" id="targetKB" value="0" min="0" step="50" style="width:7rem" />
+          </label>
+          <span class="pill">Leave 0 for lossless PNG</span>
+        </div>
 
-      <div class="row">
-        <label><input type="checkbox" id="useQuant" checked /> Quantize colors before encode</label>
-        <label><input type="checkbox" id="removeBlack" /> Remove black background</label>
-        <label>Threshold <input type="number" id="blackThresh" value="8" min="0" max="64" style="width:5rem" /></label>
-        <span class="pill">Use low threshold (4–10) for cleaner edges</span>
-      </div>
+        <div class="row">
+          <label>Max Width <input type="number" id="maxW" value="99999" min="16" style="width:6rem" /></label>
+          <label>Max Height <input type="number" id="maxH" value="99999" min="16" style="width:6rem" /></label>
+          <span class="pill">Keep extremely large to avoid downscale</span>
+        </div>
 
-      <div class="row" id="progressWrap" style="display:none">
-        <span class="kv" id="progLabel">Encoding…</span>
-        <progress id="prog" max="100" value="0"></progress>
-        <span class="kv" id="progDetail"></span>
+        <div class="row">
+          <label><input type="checkbox" id="useQuant" /> Quantize colors (smaller, lossy)</label>
+          <label><input type="checkbox" id="removeBlack" /> Remove black background</label>
+          <label>Threshold <input type="number" id="blackThresh" value="8" min="0" max="64" style="width:5rem" /></label>
+          <span class="pill">Keep OFF unless you truly need transparency</span>
+        </div>
       </div>
+    </details>
+
+    <div class="section row" id="progressWrap" style="display:none">
+      <span class="kv" id="progLabel">Encoding…</span>
+      <progress id="prog" max="100" value="0"></progress>
+      <span class="kv" id="progDetail"></span>
     </div>
 
     <div class="section">
       <h3 style="margin:.25rem 0 .5rem">Preview</h3>
       <div id="lottieContainer" class="preview"></div>
-      <div class="hint">Live preview of the generated JSON (same data you download).</div>
       <div class="subtle" id="resultNote"></div>
     </div>
   </div>
@@ -142,15 +138,13 @@ const statFrames  = $('statFrames');
 const statDuration= $('statDuration');
 const statFps     = $('statFps');
 const statSize    = $('statSize');
+const statMode    = $('statMode');
 const gifStats    = $('gifStats');
 
 const frameMode   = $('frameMode');
-const maxFrames   = $('maxFrames');
-const targetFps   = $('targetFps');
-const keepNth     = $('keepNth');
-const maxFramesWrap= $('maxFramesWrap');
-const targetFpsWrap=$('targetFpsWrap');
-const keepNthWrap = $('keepNthWrap');
+const maxFramesEl = $('maxFrames');
+const targetFpsEl = $('targetFps');
+const keepNthEl   = $('keepNth');
 
 const embedFormat = $('embedFormat');
 const webpQ       = $('webpQ');
@@ -172,6 +166,7 @@ let parsedGif = null;
 let gifW = 0, gifH = 0;
 let lottiePlayer = null;
 let origBytes = 0;
+let gifBgRGBA = null;  // detected GIF bg color for correct disposal/background fill
 
 /* ---------- UI helpers ---------- */
 function setStatus(msg, isError=false){
@@ -184,13 +179,22 @@ function resetPreview(){
   if (lottiePlayer) { try { lottiePlayer.destroy(); } catch(_){} lottiePlayer = null; }
 }
 function resetAll(){
-  gifFrames = null; parsedGif = null; gifW=0; gifH=0; origBytes = 0;
+  gifFrames = null; parsedGif = null; gifW=0; gifH=0; origBytes = 0; gifBgRGBA = null;
   convertBtn.disabled = true;
   setStatus('Load a GIF to begin.');
   resetPreview();
   fileInput.value = '';
   showProgress(false);
   gifStats.style.display = 'none';
+  // Reset Advanced to AUTO lossless
+  frameMode.value = 'auto';
+  embedFormat.value = 'png';
+  webpQ.value = 0.75;
+  targetKB.value = 0;
+  maxW.value = 99999; maxH.value = 99999;
+  useQuant.checked = false;
+  removeBlack.checked = false;
+  blackThresh.value = 8;
 }
 resetBtn.addEventListener('click', resetAll);
 
@@ -199,24 +203,14 @@ function showProgress(show, label='', val=0, detail=''){
   if (show){ prog.value = val; progLabel.textContent = label || 'Encoding…'; progDetail.textContent = detail || ''; }
 }
 
-/* ---------- Frame Mode UI enable/disable ---------- */
-function syncFrameModeUI(){
-  const mode = frameMode.value;
-  maxFramesWrap.classList.toggle('disabled', !(mode === 'auto' || mode === 'max'));
-  targetFpsWrap.classList.toggle('disabled', mode !== 'fps');
-  keepNthWrap.classList.toggle('disabled', mode !== 'step');
-}
-frameMode.addEventListener('change', syncFrameModeUI);
-syncFrameModeUI();
-
-/* ---------- Load GIF ---------- */
+/* ---------- Load GIF (AUTO sets lossless) ---------- */
 fileInput.addEventListener('change', async () => {
   resetPreview();
   const f = fileInput.files?.[0];
   if (!f) return;
   origBytes = f.size;
-  if (f.size > 100 * 1024 * 1024) {
-    setStatus('File too large (max 100 MB).', true);
+  if (f.size > 200 * 1024 * 1024) { // allow bigger for lossless; change if you want
+    setStatus('File too large (max 200 MB).', true);
     fileInput.value = '';
     return;
   }
@@ -227,6 +221,29 @@ fileInput.addEventListener('change', async () => {
     gifFrames = decompressFrames(parsedGif, true);
     gifW = parsedGif.lsd.width;
     gifH = parsedGif.lsd.height;
+
+    // Detect GIF background color (if present) for correct background/disposal fill.
+    try {
+      const gct = parsedGif.gct;         // array of [r,g,b]
+      const bgIndex = parsedGif.lsd.bgColor;
+      if (gct && Number.isInteger(bgIndex) && gct[bgIndex]) {
+        const [r,g,b] = gct[bgIndex];
+        gifBgRGBA = `rgba(${r},${g},${b},1)`;
+      } else {
+        gifBgRGBA = null;
+      }
+    } catch(_) { gifBgRGBA = null; }
+
+    // AUTO: enforce lossless fidelity defaults
+    frameMode.value = 'auto';            // keep all frames
+    embedFormat.value = 'png';           // lossless
+    webpQ.value = 0.75;                  // ignored (PNG)
+    targetKB.value = 0;                  // no auto-size
+    maxW.value = 99999; maxH.value = 99999;  // no downscale
+    useQuant.checked = false;            // no color quantization
+    removeBlack.checked = false;         // no keying
+    blackThresh.value = 8;
+
     convertBtn.disabled = !gifFrames?.length;
 
     // Detected stats
@@ -238,14 +255,10 @@ fileInput.addEventListener('change', async () => {
     statDuration.textContent = `${(totalMs/1000).toFixed(2)} s`;
     statFps.textContent      = fps ? fps.toFixed(2) : '—';
     statSize.textContent     = `${(origBytes/1024/1024).toFixed(2)} MB`;
+    statMode.textContent     = 'AUTO • Lossless PNG';
     gifStats.style.display   = 'flex';
 
-    // Auto suggest max frames based on duration & total frames (aim ≤ 300)
-    // For long clips, try to keep ~20 fps * duration but clamp to 300
-    const desired = Math.min(300, Math.max(120, Math.round((totalMs/1000) * 20)));
-    maxFrames.value = Math.min(desired, 300);
-
-    setStatus(`Loaded ${gifFrames.length} frames @ ${gifW}×${gifH}. Choose strategy and convert.`);
+    setStatus(`Loaded ${gifFrames.length} frames @ ${gifW}×${gifH}. AUTO set to Lossless PNG (same as GIF).`);
   } catch (e) {
     console.error(e);
     setStatus('Failed to read GIF. Is the file valid?', true);
@@ -263,30 +276,31 @@ convertBtn.addEventListener('click', async () => {
   try {
     const json = await gifToLottieSingleJSON(gifFrames, {
       logicalW: gifW, logicalH: gifH,
-      maxW: parseInt(maxW.value,10) || 4096,
-      maxH: parseInt(maxH.value,10) || 4096,
+      // use current advanced values (AUTO already set them to lossless)
       frameMode: frameMode.value,
-      maxFrames: Math.max(50, parseInt(maxFrames.value,10) || 300),
-      targetFps: Math.max(2, Math.min(60, parseInt(targetFps.value,10) || 20)),
-      keepNth: Math.max(2, parseInt(keepNth.value,10) || 2),
-      format: embedFormat.value, // 'webp' | 'png'
+      maxFrames: Math.max(1, parseInt(maxFramesEl.value,10) || 999999),
+      targetFps: Math.max(2, Math.min(60, parseInt(targetFpsEl.value,10) || 20)),
+      keepNth: Math.max(2, parseInt(keepNthEl.value,10) || 2),
+      format: embedFormat.value, // 'png' (lossless) or 'webp'
       webpQ: Math.max(0, Math.min(1, parseFloat(webpQ.value))),
       targetKB: Math.max(0, parseInt(targetKB.value,10) || 0),
+      maxW: parseInt(maxW.value,10) || 99999,
+      maxH: parseInt(maxH.value,10) || 99999,
       quantize: !!useQuant.checked,
       removeBlack: !!removeBlack.checked,
       blackThresh: parseInt(blackThresh.value,10) || 0,
       onProgress: (stage, i, total) => {
-        if (stage === 'compose') showProgress(true, 'Compositing frames…', Math.round((i/total)*15), `${i}/${total}`);
-        if (stage === 'resize')  showProgress(true, 'Resizing frames…',     15 + Math.round((i/total)*15), `${i}/${total}`);
-        if (stage === 'dedupe')  showProgress(true, 'Deduplicating…',       30);
-        if (stage === 'cap')     showProgress(true, 'Capping frames…',      35);
-        if (stage === 'quant')   showProgress(true, 'Quantizing colors…',   40 + Math.round((i/total)*20), `${i}/${total}`);
+        if (stage === 'compose') showProgress(true, 'Compositing frames…', Math.round((i/total)*20), `${i}/${total}`);
+        if (stage === 'resize')  showProgress(true, 'Resizing frames…',     20 + Math.round((i/total)*20), `${i}/${total}`);
+        if (stage === 'dedupe')  showProgress(true, 'Deduplicating…',       40);
+        if (stage === 'cap')     showProgress(true, 'Frame strategy…',      45);
+        if (stage === 'quant')   showProgress(true, 'Quantizing colors…',   50 + Math.round((i/total)*10), `${i}/${total}`);
         if (stage === 'encode')  showProgress(true, 'Encoding images…',     60 + Math.round((i/total)*35), `${i}/${total}`);
         if (stage === 'assemble')showProgress(true, 'Assembling JSON…',     95);
       }
     });
 
-    // Preview (canvas renderer = sharper)
+    // Preview (canvas = sharp for bitmaps)
     resetPreview();
     lottiePlayer = lottie.loadAnimation({
       container: lottieDiv,
@@ -306,7 +320,7 @@ convertBtn.addEventListener('click', async () => {
     document.body.appendChild(a); a.click(); a.remove();
 
     const prettySizeKB = (str.length/1024).toFixed(0);
-    resultNote.textContent = `Original GIF: ${(origBytes/1024/1024).toFixed(2)} MB • JSON: ${prettySizeKB} KB • Layers: ${json.layers.length}`;
+    resultNote.textContent = `Original GIF: ${(origBytes/1024/1024).toFixed(2)} MB • JSON: ${prettySizeKB} KB • Layers: ${json.layers.length} • Mode: ${embedFormat.value.toUpperCase()} ${useQuant.checked?'(quantized)':'(lossless)'}`;
     setStatus(`Done. JSON ~ ${prettySizeKB} KB. Previewing and downloaded.`);
   } catch (e) {
     console.error(e);
@@ -317,21 +331,31 @@ convertBtn.addEventListener('click', async () => {
   }
 });
 
-/* ---------- Core conversion pipeline ---------- */
+/* ---------- Core conversion (lossless-first) ---------- */
 
-// Compose frames to full logical canvas with disposal handling
+// Compose frames to full logical canvas with correct background & disposal
 function composeGifFramesToCanvases(frames, logicalW, logicalH, onProgress){
   const comp = document.createElement('canvas'); comp.width = logicalW; comp.height = logicalH;
   const ctx  = comp.getContext('2d', { willReadFrequently: true });
+
+  // Initial fill: use GIF bg color if available; else transparent
+  if (gifBgRGBA) {
+    ctx.save(); ctx.fillStyle = gifBgRGBA; ctx.fillRect(0,0,logicalW,logicalH); ctx.restore();
+  } else {
+    ctx.clearRect(0,0,logicalW,logicalH);
+  }
+
   let prevImageData = null;
   const outs = [];
 
   frames.forEach((f, idx) => {
     const { left, top, width, height } = f.dims;
-    const disposal = f.disposalType || 0; // 0/1 none, 2 bg, 3 previous
+    const disposal = f.disposalType || 0; // 0/1 none, 2 background, 3 previous
+
     if (disposal === 3) {
       try { prevImageData = ctx.getImageData(0, 0, logicalW, logicalH); } catch(_) { prevImageData = null; }
     }
+
     const patch = new ImageData(new Uint8ClampedArray(f.patch), width, height);
     ctx.putImageData(patch, left, top);
 
@@ -339,14 +363,23 @@ function composeGifFramesToCanvases(frames, logicalW, logicalH, onProgress){
     out.getContext('2d').drawImage(comp, 0, 0);
     outs.push(out);
 
-    if (disposal === 2) ctx.clearRect(left, top, width, height);
-    else if (disposal === 3 && prevImageData) ctx.putImageData(prevImageData, 0, 0);
+    if (disposal === 2) {
+      if (gifBgRGBA) {
+        ctx.save(); ctx.fillStyle = gifBgRGBA; ctx.fillRect(left, top, width, height); ctx.restore();
+      } else {
+        ctx.clearRect(left, top, width, height);
+      }
+    } else if (disposal === 3 && prevImageData) {
+      ctx.putImageData(prevImageData, 0, 0);
+    }
 
     onProgress && onProgress('compose', idx+1, frames.length);
   });
+
   return outs;
 }
 
+// No downscale in AUTO (maxW/maxH are huge); still exposing helper for Advanced
 function downscale(canvas, maxW, maxH){
   const sw = canvas.width, sh = canvas.height;
   const scale = Math.min(maxW/sw, maxH/sh, 1);
@@ -360,7 +393,23 @@ function downscale(canvas, maxW, maxH){
   return out;
 }
 
-/* Feathered black chroma key + defringe */
+/* Un-premultiply black matte — prevents black fringe on start */
+function unpremultiplyBlackMatte(canvas){
+  const ctx = canvas.getContext('2d', { willReadFrequently:true });
+  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const d = img.data;
+  for (let i=0;i<d.length;i+=4){
+    const a = d[i+3];
+    if (a > 0 && a < 255) {
+      d[i]   = Math.min(255, Math.round(d[i]   * 255 / a));
+      d[i+1] = Math.min(255, Math.round(d[i+1] * 255 / a));
+      d[i+2] = Math.min(255, Math.round(d[i+2] * 255 / a));
+    }
+  }
+  ctx.putImageData(img,0,0);
+}
+
+/* Optional feathered key + defringe (Advanced only; AUTO keeps OFF) */
 function chromaKeyBlackFeather(canvas, thr = 8, soft = 10, spill = 0.25) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -408,14 +457,14 @@ function defringeAlphaEdges(canvas, passes = 1) {
   }
 }
 
-/* Hash for dedupe */
+/* Tiny hash for frame dedupe (keeps exact timing by merging delay) */
 function tinyHash(canvas){
   const s=16; const h=document.createElement('canvas'); h.width=s; h.height=s;
   const ctx=h.getContext('2d'); ctx.drawImage(canvas,0,0,s,s);
   return h.toDataURL('image/webp',0.5);
 }
 
-/* image-q quantization */
+/* Optional quantization (Advanced only) */
 function quantizeCanvasInPlace(canvas, paletteSize=56){
   const ctx = canvas.getContext('2d');
   const img = ctx.getImageData(0,0,canvas.width,canvas.height);
@@ -444,7 +493,7 @@ function canvasToDataURL(canvas, format, quality){
       r.readAsDataURL(b);
     }, 'image/webp', quality));
   } else {
-    return Promise.resolve(canvas.toDataURL('image/png'));
+    return Promise.resolve(canvas.toDataURL('image/png')); // lossless
   }
 }
 async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12){
@@ -466,7 +515,7 @@ async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12)
   return Math.max(0.05, Math.min(0.95, best));
 }
 
-/* Decimation strategies */
+/* Decimation (Advanced only — AUTO keeps all) */
 function decimateToMaxFrames(canvases, delaysMs, maxCount){
   if (canvases.length <= maxCount) return { canvases, delaysMs };
   const keep = [], keepDelays = [];
@@ -486,9 +535,7 @@ function decimateToTargetFps(canvases, delaysMs, fps){
   for (let i=0;i<canvases.length;i++){
     acc += delaysMs[i];
     if (acc >= period){
-      keep.push(canvases[i]);
-      keepDelays.push(acc);
-      acc = 0;
+      keep.push(canvases[i]); keepDelays.push(acc); acc = 0;
     }
   }
   if (acc > 0 && keepDelays.length) keepDelays[keepDelays.length-1] += acc;
@@ -506,79 +553,77 @@ function decimateEveryNth(canvases, delaysMs, n){
   return { canvases: keep, delaysMs: keepDelays };
 }
 
+/* Main pipeline — AUTO path = lossless, no changes */
 async function gifToLottieSingleJSON(framesRaw, opts){
   const {
-    logicalW, logicalH, maxW, maxH, frameMode, maxFrames, targetFps, keepNth,
-    format, webpQ, targetKB, quantize, removeBlack, blackThresh, onProgress
+    logicalW, logicalH, frameMode, maxFrames, targetFps, keepNth,
+    format, webpQ, targetKB, maxW, maxH, quantize, removeBlack, blackThresh, onProgress
   } = opts;
 
-  // 1) Compose full logical frames with correct disposal handling
+  // 1) Compose full logical frames with correct background + disposal
   const composed = composeGifFramesToCanvases(framesRaw, logicalW, logicalH, onProgress);
 
-  // 2) Downscale + optional black removal (feathered) + defringe
+  // 2) No downscale in AUTO (maxW/H huge) — still call helper to honor Advanced
   const resized = composed.map((c, i) => {
     const r = downscale(c, maxW, maxH);
+    // Always un-premultiply to avoid black fringe, even if not keying
+    unpremultiplyBlackMatte(r);
     if (removeBlack) { chromaKeyBlackFeather(r, Math.max(0, blackThresh - 2), 10, 0.25); defringeAlphaEdges(r, 1); }
     onProgress && onProgress('resize', i+1, composed.length);
     return r;
   });
 
-  // 3) Deduplicate consecutive identical frames
+  // 3) Deduplicate identical consecutive frames (keeps exact timing)
   const delaysMs = framesRaw.map(f => (f.delay || 10) * 10);
   const uniq = []; const uniqDelays = [];
-  let last = null;
+  let lastHash = null;
   resized.forEach((c, i) => {
     const h = tinyHash(c);
-    if (h === last && uniq.length) { uniqDelays[uniqDelays.length-1] += delaysMs[i]; }
-    else { uniq.push(c); uniqDelays.push(delaysMs[i]); last = h; }
+    if (h === lastHash && uniq.length){ uniqDelays[uniqDelays.length-1] += delaysMs[i]; }
+    else { uniq.push(c); uniqDelays.push(delaysMs[i]); lastHash = h; }
   });
   onProgress && onProgress('dedupe');
 
-  // 3.5) Decimation (auto or manual)
-  let dec = { canvases: uniq, delaysMs: uniqDelays };
-  if (frameMode === 'auto'){
-    const totalMs = delaysMs.reduce((a,b)=>a+b,0);
-    const desired = Math.min(maxFrames, Math.max(120, Math.round((totalMs/1000)*20))); // aim ~20fps but ≤ max
-    dec = decimateToMaxFrames(uniq, uniqDelays, desired);
-  } else if (frameMode === 'max'){
-    dec = decimateToMaxFrames(uniq, uniqDelays, maxFrames);
-  } else if (frameMode === 'fps'){
-    dec = decimateToTargetFps(uniq, uniqDelays, targetFps);
-    if (dec.canvases.length > maxFrames) dec = decimateToMaxFrames(dec.canvases, dec.delaysMs, maxFrames);
-  } else if (frameMode === 'step'){
-    dec = decimateEveryNth(uniq, uniqDelays, keepNth);
-    if (dec.canvases.length > maxFrames) dec = decimateToMaxFrames(dec.canvases, dec.delaysMs, maxFrames);
+  // 3.5) Frame strategy — AUTO keeps all frames (lossless trajectory)
+  let frames = uniq, frameDelays = uniqDelays;
+  if (frameMode === 'max') {
+    const dec = decimateToMaxFrames(uniq, uniqDelays, maxFrames);
+    frames = dec.canvases; frameDelays = dec.delaysMs;
+  } else if (frameMode === 'fps') {
+    const dec = decimateToTargetFps(uniq, uniqDelays, targetFps);
+    frames = dec.canvases; frameDelays = dec.delaysMs;
+  } else if (frameMode === 'step') {
+    const dec = decimateEveryNth(uniq, uniqDelays, keepNth);
+    frames = dec.canvases; frameDelays = dec.delaysMs;
   }
-  const cappedFrames = dec.canvases;
-  const cappedDelays = dec.delaysMs;
   onProgress && onProgress('cap');
 
-  // 4) Optional quantization
+  // 4) Quantization — OFF in AUTO (lossless). Only if Advanced toggled.
   if (quantize) {
-    for (let i=0; i<cappedFrames.length; i++){
-      try { quantizeCanvasInPlace(cappedFrames[i], 56); } catch(e){}
-      onProgress && onProgress('quant', i+1, cappedFrames.length);
+    for (let i=0; i<frames.length; i++){
+      try { quantizeCanvasInPlace(frames[i], 56); } catch(e){}
+      onProgress && onProgress('quant', i+1, frames.length);
     }
   }
 
-  // 5) Auto-size quality (WebP)
+  // 5) Auto-size quality — ignored for PNG (lossless). Used only if WebP chosen.
   let finalQuality = webpQ;
   const targetBytes = targetKB > 0 ? targetKB * 1024 : 0;
   if (format === 'webp' && targetBytes > 0){
-    finalQuality = await autosizeQuality(cappedFrames, webpQ, targetBytes);
+    finalQuality = await autosizeQuality(frames, webpQ, targetBytes);
   }
 
-  // 6) Encode frames to data URLs
+  // 6) Encode frames (PNG = lossless)
   const dataURLs = [];
-  for (let i=0; i<cappedFrames.length; i++){
-    const url = await canvasToDataURL(cappedFrames[i], format, finalQuality);
+  for (let i=0; i<frames.length; i++){
+    const url = await canvasToDataURL(frames[i], format, finalQuality);
     dataURLs.push(url);
-    onProgress && onProgress('encode', i+1, cappedFrames.length);
+    onProgress && onProgress('encode', i+1, frames.length);
   }
 
-  // 7) Assemble Lottie JSON
+  // 7) Assemble Lottie JSON (exact timing via ip/op at fr=30)
   onProgress && onProgress('assemble');
-  const w = cappedFrames[0].width, h = cappedFrames[0].height;
+  const w = frames[0].width, h = frames[0].height;
   const fr = 30;
   const assets = []; const layers = [];
   let t = 0;
@@ -587,16 +632,16 @@ async function gifToLottieSingleJSON(framesRaw, opts){
     const id = `img_${i}`;
     assets.push({ id, w, h, p: dataURLs[i], e: 1 });
     const ip = Math.round((t/1000)*fr);
-    const op = Math.round(((t + cappedDelays[i])/1000) * fr);
+    const op = Math.round(((t + frameDelays[i])/1000) * fr);
     layers.push({
       ddd:0, ind:i+1, ty:2, refId:id,
       ks:{ o:{a:0,k:100}, r:{a:0,k:0}, p:{a:0,k:[w/2,h/2,0]}, a:{a:0,k:[w/2,h/2,0]}, s:{a:0,k:[100,100,100]} },
       ip, op, st:0, bm:0
     });
-    t += cappedDelays[i];
+    t += frameDelays[i];
   }
 
-  return { v:"5.7.4", fr, ip:0, op: layers.length ? layers[layers.length-1].op : 0, w, h, nm:"GIF2Lottie (Embedded)", ddd:0, assets, layers };
+  return { v:"5.7.4", fr, ip:0, op: layers.length ? layers[layers.length-1].op : 0, w, h, nm:"GIF2Lottie (Lossless PNG in JSON)", ddd:0, assets, layers };
 }
 </script>
 </body>
