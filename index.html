@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GIF ➜ Lottie JSON (Optimized, Single File)</title>
+<title>GIF ➜ Lottie JSON (Final, Optimized, Single File)</title>
 <style>
   :root { color-scheme: dark; }
   body {
@@ -11,7 +11,7 @@
     margin:0; padding:2rem; display:flex; justify-content:center;
   }
   .card {
-    width:min(960px, 95vw); background:#1e1e1e; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.45);
+    width:min(980px, 96vw); background:#1e1e1e; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.45);
     padding:22px;
   }
   h2 { margin:.25rem 0 1rem; color:#fafafa }
@@ -27,7 +27,7 @@
   button:disabled { background:#555; cursor:not-allowed }
   button:hover:not(:disabled) { background:#1976d2 }
   .preview {
-    border:1px solid #333; border-radius:10px; height:360px; background:#121212;
+    border:1px solid #333; border-radius:10px; height:380px; background:#121212;
   }
   .hint { color:#aaa; font-size:.92rem }
   .danger { color:#ff7676 }
@@ -38,7 +38,7 @@
 </head>
 <body>
   <div class="card">
-    <h2>GIF ➜ Lottie JSON (Single File, Optimized)</h2>
+    <h2>GIF ➜ Lottie JSON (Single File, Final)</h2>
 
     <div class="section row">
       <input id="fileInput" type="file" accept=".gif" />
@@ -64,17 +64,21 @@
         </label>
         <span class="pill">>0 auto-tunes WebP to hit target</span>
       </div>
+
       <div class="row">
         <label>Max Width <input type="number" id="maxW" value="512" min="16" style="width:6rem" /></label>
         <label>Max Height <input type="number" id="maxH" value="512" min="16" style="width:6rem" /></label>
-        <span class="pill">Downscale to fit (keeps aspect)</span>
+        <label>Max Frames <input type="number" id="maxFrames" value="300" min="50" step="10" style="width:6rem" /></label>
+        <span class="pill">Caps layers for player performance</span>
       </div>
+
       <div class="row">
         <label><input type="checkbox" id="useQuant" checked /> Quantize colors before encode</label>
         <label><input type="checkbox" id="removeBlack" /> Remove black background</label>
         <label>Threshold <input type="number" id="blackThresh" value="8" min="0" max="64" style="width:5rem" /></label>
-        <span class="pill">Use small threshold (4–10) for cleaner edges</span>
+        <span class="pill">Use low threshold (4–10) for cleaner edges</span>
       </div>
+
       <div class="row" id="progressWrap" style="display:none">
         <span class="kv" id="progLabel">Encoding…</span>
         <progress id="prog" max="100" value="0"></progress>
@@ -96,7 +100,7 @@
 <script type="module">
 import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
 import lottie from 'https://esm.sh/lottie-web';
-import * as IQ from 'https://esm.sh/image-q@4.0.0'; // optional quantization
+import * as IQ from 'https://esm.sh/image-q@4.0.0'; // quantization
 
 /* ---------- Elements ---------- */
 const $ = id => document.getElementById(id);
@@ -106,14 +110,17 @@ const convertBtn  = $('convertBtn');
 const resetBtn    = $('resetBtn');
 const lottieDiv   = $('lottieContainer');
 const statusEl    = $('status');
+
 const embedFormat = $('embedFormat');
 const webpQ       = $('webpQ');
 const targetKB    = $('targetKB');
 const maxW        = $('maxW');
 const maxH        = $('maxH');
+const maxFrames   = $('maxFrames');
 const useQuant    = $('useQuant');
 const removeBlack = $('removeBlack');
 const blackThresh = $('blackThresh');
+
 const progWrap    = $('progressWrap');
 const prog        = $('prog');
 const progLabel   = $('progLabel');
@@ -189,6 +196,7 @@ convertBtn.addEventListener('click', async () => {
       logicalW: gifW, logicalH: gifH,
       maxW: parseInt(maxW.value,10) || 4096,
       maxH: parseInt(maxH.value,10) || 4096,
+      maxFrames: Math.max(50, parseInt(maxFrames.value,10) || 300),
       format: embedFormat.value, // 'webp' | 'png'
       webpQ: Math.max(0, Math.min(1, parseFloat(webpQ.value))),
       targetKB: Math.max(0, parseInt(targetKB.value,10) || 0),
@@ -196,8 +204,10 @@ convertBtn.addEventListener('click', async () => {
       removeBlack: !!removeBlack.checked,
       blackThresh: parseInt(blackThresh.value,10) || 0,
       onProgress: (stage, i, total) => {
-        if (stage === 'compose') showProgress(true, 'Compositing frames…', Math.round((i/total)*20), `${i}/${total}`);
-        if (stage === 'resize')  showProgress(true, 'Resizing frames…',     20 + Math.round((i/total)*20), `${i}/${total}`);
+        if (stage === 'compose') showProgress(true, 'Compositing frames…', Math.round((i/total)*15), `${i}/${total}`);
+        if (stage === 'resize')  showProgress(true, 'Resizing frames…',     15 + Math.round((i/total)*15), `${i}/${total}`);
+        if (stage === 'dedupe')  showProgress(true, 'Deduplicating…',       30);
+        if (stage === 'cap')     showProgress(true, 'Capping frames…',      35);
         if (stage === 'quant')   showProgress(true, 'Quantizing colors…',   40 + Math.round((i/total)*20), `${i}/${total}`);
         if (stage === 'encode')  showProgress(true, 'Encoding images…',     60 + Math.round((i/total)*35), `${i}/${total}`);
         if (stage === 'assemble')showProgress(true, 'Assembling JSON…',     95);
@@ -247,21 +257,17 @@ function composeGifFramesToCanvases(frames, logicalW, logicalH, onProgress){
     const { left, top, width, height } = f.dims;
     const disposal = f.disposalType || 0; // 0/1 none, 2 bg, 3 previous
 
-    // Save state for disposal=3 BEFORE drawing patch
     if (disposal === 3) {
       try { prevImageData = ctx.getImageData(0, 0, logicalW, logicalH); } catch(_) { prevImageData = null; }
     }
 
-    // Draw current patch (includes alpha)
     const patch = new ImageData(new Uint8ClampedArray(f.patch), width, height);
     ctx.putImageData(patch, left, top);
 
-    // Snapshot composed frame
     const out = document.createElement('canvas'); out.width = logicalW; out.height = logicalH;
     out.getContext('2d').drawImage(comp, 0, 0);
     outs.push(out);
 
-    // Apply disposal for next frame
     if (disposal === 2) {
       ctx.clearRect(left, top, width, height);
     } else if (disposal === 3 && prevImageData) {
@@ -290,23 +296,20 @@ function downscale(canvas, maxW, maxH){
 
 /* --- Feathered black chroma key (no harsh halos) --- */
 function chromaKeyBlackFeather(canvas, thr = 8, soft = 10, spill = 0.25) {
-  // thr = start of full cut; soft = feather width; spill = desaturate near edge
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const d = img.data;
-  const t0 = thr;
-  const t1 = thr + soft;
+  const t0 = thr, t1 = thr + soft;
 
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i], g = d[i+1], b = d[i+2];
     const a0 = d[i+3];
-    const m = Math.max(r, g, b); // distance from black
+    const m = Math.max(r, g, b);
 
     if (m <= t1) {
       const a = (m <= t0) ? 0 : Math.round(((m - t0) / (t1 - t0)) * a0);
       d[i+3] = a;
 
-      // spill reduction for semi-transparent edge pixels
       if (a < a0 && spill > 0) {
         const gray = (r + g + b) / 3;
         d[i]   = Math.round(r * (1 - spill) + gray * spill);
@@ -361,8 +364,8 @@ function tinyHash(canvas){
   return h.toDataURL('image/webp',0.5);
 }
 
-// image-q quantization (safe for v4 builds)
-function quantizeCanvasInPlace(canvas, paletteSize=48){
+/* --- image-q quantization (safe for v4 builds) --- */
+function quantizeCanvasInPlace(canvas, paletteSize=56){
   const ctx = canvas.getContext('2d');
   const img = ctx.getImageData(0,0,canvas.width,canvas.height);
 
@@ -400,7 +403,6 @@ function canvasToDataURL(canvas, format, quality){
 }
 
 async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12){
-  // Only for WebP. Sample a subset of frames, binary search quality to hit target size.
   const idxs = [];
   const step = Math.max(1, Math.floor(frames.length / sampleCount));
   for (let i=0;i<frames.length; i+=step) idxs.push(i);
@@ -412,7 +414,7 @@ async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12)
     let total = 0;
     for (const i of idxs){
       const url = await canvasToDataURL(frames[i], 'webp', mid);
-      total += (url.length * 3/4); // rough bytes from base64 length
+      total += (url.length * 3/4);
     }
     const estBytes = (total / idxs.length) * frames.length;
     if (Math.abs(estBytes - targetBytes) < Math.abs(bestBytes - targetBytes)){
@@ -423,9 +425,27 @@ async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12)
   return Math.max(0.05, Math.min(0.95, best));
 }
 
+/* --- Decimate to cap frames (keeps timing) --- */
+function decimateToMaxFrames(canvases, delaysMs, maxCount){
+  if (canvases.length <= maxCount) return { canvases, delaysMs };
+  const keep = [], keepDelays = [];
+  const step = Math.ceil(canvases.length / maxCount);
+  let accDelay = 0;
+  for (let i = 0; i < canvases.length; i++){
+    accDelay += delaysMs[i];
+    if (i % step === 0) {
+      keep.push(canvases[i]);
+      keepDelays.push(accDelay);
+      accDelay = 0;
+    }
+  }
+  if (accDelay > 0 && keepDelays.length) keepDelays[keepDelays.length - 1] += accDelay;
+  return { canvases: keep, delaysMs: keepDelays };
+}
+
 async function gifToLottieSingleJSON(framesRaw, opts){
   const {
-    logicalW, logicalH, maxW, maxH, format, webpQ, targetKB,
+    logicalW, logicalH, maxW, maxH, maxFrames, format, webpQ, targetKB,
     quantize, removeBlack, blackThresh, onProgress
   } = opts;
 
@@ -443,15 +463,14 @@ async function gifToLottieSingleJSON(framesRaw, opts){
     return r;
   });
 
-  // 3) Merge consecutive identical frames
+  // 3) Deduplicate consecutive identical frames (by tiny hash)
   const delaysMs = framesRaw.map(f => (f.delay || 10) * 10);
   const uniq = [];
   const uniqDelays = [];
   let lastHash = null;
-
   resized.forEach((c, i) => {
     const h = tinyHash(c);
-    if (h === lastHash && uniq.length){
+    if (h === lastHash && uniq.length) {
       uniqDelays[uniqDelays.length-1] += delaysMs[i];
     } else {
       uniq.push(c);
@@ -459,12 +478,22 @@ async function gifToLottieSingleJSON(framesRaw, opts){
       lastHash = h;
     }
   });
+  onProgress && onProgress('dedupe');
+
+  // 3.5) Cap total frames to avoid Lottie layer explosion
+  let cappedFrames = uniq, cappedDelays = uniqDelays;
+  if (uniq.length > maxFrames) {
+    const dec = decimateToMaxFrames(uniq, uniqDelays, maxFrames);
+    cappedFrames = dec.canvases;
+    cappedDelays = dec.delaysMs;
+  }
+  onProgress && onProgress('cap');
 
   // 4) Optional quantization (reduces colors → smaller PNG/WebP)
   if (quantize) {
-    for (let i=0; i<uniq.length; i++){
-      try { quantizeCanvasInPlace(uniq[i], 56); } catch(e){ /* safe skip */ }
-      onProgress && onProgress('quant', i+1, uniq.length);
+    for (let i=0; i<cappedFrames.length; i++){
+      try { quantizeCanvasInPlace(cappedFrames[i], 56); } catch(e){ /* safe skip */ }
+      onProgress && onProgress('quant', i+1, cappedFrames.length);
     }
   }
 
@@ -472,21 +501,20 @@ async function gifToLottieSingleJSON(framesRaw, opts){
   let finalQuality = webpQ;
   const targetBytes = targetKB > 0 ? targetKB * 1024 : 0;
   if (format === 'webp' && targetBytes > 0){
-    showProgress(true, 'Auto-sizing quality…');
-    finalQuality = await autosizeQuality(uniq, webpQ, targetBytes);
+    finalQuality = await autosizeQuality(cappedFrames, webpQ, targetBytes);
   }
 
   // 6) Encode frames to data URLs
   const dataURLs = [];
-  for (let i=0; i<uniq.length; i++){
-    const url = await canvasToDataURL(uniq[i], format, finalQuality);
+  for (let i=0; i<cappedFrames.length; i++){
+    const url = await canvasToDataURL(cappedFrames[i], format, finalQuality);
     dataURLs.push(url);
-    onProgress && onProgress('encode', i+1, uniq.length);
+    onProgress && onProgress('encode', i+1, cappedFrames.length);
   }
 
   // 7) Assemble Lottie JSON (image sequence with correct ip/op at fr=30)
   onProgress && onProgress('assemble');
-  const w = uniq[0].width, h = uniq[0].height;
+  const w = cappedFrames[0].width, h = cappedFrames[0].height;
   const fr = 30;
   const assets = [];
   const layers = [];
@@ -494,15 +522,15 @@ async function gifToLottieSingleJSON(framesRaw, opts){
 
   for (let i=0;i<dataURLs.length;i++){
     const id = `img_${i}`;
-    assets.push({ id, w, h, p: dataURLs[i], e: 1 }); // embedded data URL
+    assets.push({ id, w, h, p: dataURLs[i], e: 1 });
     const ip = Math.round((t/1000)*fr);
-    const op = Math.round(((t + uniqDelays[i])/1000) * fr);
+    const op = Math.round(((t + cappedDelays[i])/1000) * fr);
     layers.push({
       ddd:0, ind:i+1, ty:2, refId:id,
       ks:{ o:{a:0,k:100}, r:{a:0,k:0}, p:{a:0,k:[w/2,h/2,0]}, a:{a:0,k:[w/2,h/2,0]}, s:{a:0,k:[100,100,100]} },
       ip, op, st:0, bm:0
     });
-    t += uniqDelays[i];
+    t += cappedDelays[i];
   }
 
   return { v:"5.7.4", fr, ip:0, op: layers.length ? layers[layers.length-1].op : 0, w, h, nm:"GIF2Lottie (Embedded)", ddd:0, assets, layers };
