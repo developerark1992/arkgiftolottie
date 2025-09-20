@@ -3,282 +3,280 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ARK GIF ➜ Lottie (Single JSON)</title>
+<title>GIF ➜ Lottie (Single JSON)</title>
 <style>
   :root { color-scheme: dark; }
-  body { background:#121212; color:#e0e0e0; font-family:'Segoe UI',sans-serif; padding:2rem; margin:0; display:flex; justify-content:center; }
-  .card { background:#1e1e1e; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); padding:2rem; width:90%; max-width:880px }
-  h2,h3 { margin:0 0 1rem; color:#fafafa }
-  .section { margin-bottom:1.25rem }
-  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap }
-  input, button, select, label { font-size:1rem; margin-right:.5rem; margin-top:.3rem; }
-  input[type="text"], select, input[type="number"] {
-    padding:.4rem; border-radius:6px; border:1px solid #555; background:#2b2b2b; color:#fff;
+  body { background:#121212; color:#e0e0e0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji"; margin:0; padding:2rem; display:flex; justify-content:center; }
+  .card { width: min(860px, 94vw); background:#1e1e1e; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.4); padding:24px; }
+  h2 { margin:.25rem 0 1rem; color:#fafafa }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center }
+  .section { margin:1.25rem 0 }
+  input[type="text"], input[type="number"], select {
+    background:#2a2a2a; color:#fff; border:1px solid #444; border-radius:8px; padding:.5rem .65rem; font-size:15px;
   }
   button {
-    background:#2196f3; border:none; border-radius:8px; color:#fff; cursor:pointer;
-    padding:.6rem 1.1rem; transition:background .2s;
+    background:#2196f3; color:#fff; border:0; border-radius:10px; padding:.6rem 1.1rem; font-weight:600; cursor:pointer;
   }
   button:disabled { background:#555; cursor:not-allowed }
   button:hover:not(:disabled) { background:#1976d2 }
-  img, video, #lottieContainer {
-    display:block; width:100%; margin:.5rem 0; border:1px solid #333; border-radius:8px;
-  }
-  #lottieContainer { height:320px; background:transparent }
-  .hint { font-size:.9rem; color:#aaa }
+  .preview { border:1px solid #333; border-radius:10px; height:320px; background:#121212; }
+  .hint { color:#aaa; font-size:.9rem }
+  .danger { color:#ff7676 }
 </style>
 </head>
 <body>
-<div class="card">
-  <h2>ARK Animation Converter — Single JSON (GIF ➜ Lottie)</h2>
+  <div class="card">
+    <h2>GIF ➜ Lottie (Single JSON)</h2>
 
-  <div class="section row">
-    <input type="file" id="fileInput" accept=".gif" />
-    <input type="text" id="fileNameInput" placeholder="Base filename" value="animation" />
-  </div>
+    <div class="section row">
+      <input id="fileInput" type="file" accept=".gif" />
+      <input id="baseName" type="text" value="animation" placeholder="Base filename" />
+      <button id="convertBtn" disabled>Convert to JSON</button>
+      <button id="resetBtn">Reset</button>
+    </div>
 
-  <div class="section">
-    <h3>Options</h3>
-    <div class="row">
-      <label>Embedded Format:
-        <select id="embedFormat">
-          <option value="webp">WebP (smaller)</option>
-          <option value="png">PNG (larger / max compatibility)</option>
-        </select>
-      </label>
-      <label>WebP Quality:
-        <input type="number" id="webpQ" value="0.7" min="0" max="1" step="0.05" style="width:6rem" />
-      </label>
+    <div class="section row">
+      <label><input type="checkbox" id="removeBlack"> Remove black background</label>
+      <label>Threshold <input type="number" id="blackThresh" value="28" min="0" max="128" style="width:5rem"></label>
+      <label>Max Width <input type="number" id="maxW" value="512" min="16" style="width:6rem"></label>
+      <label>Max Height <input type="number" id="maxH" value="512" min="16" style="width:6rem"></label>
+      <span class="hint">Downscales to fit box (keeps aspect ratio). Leave as original size by setting very large limits.</span>
     </div>
-    <div class="row">
-      <label>Max Width:
-        <input type="number" id="maxW" value="512" min="16" step="1" style="width:6rem" />
-      </label>
-      <label>Max Height:
-        <input type="number" id="maxH" value="512" min="16" step="1" style="width:6rem" />
-      </label>
-      <span class="hint">Downscale to fit box (keeps aspect ratio).</span>
+
+    <div class="section">
+      <div id="status" class="hint">Load a GIF to begin.</div>
     </div>
-    <div class="row">
-      <label><input type="checkbox" id="useQuant" checked /> Palette quantize before encode</label>
-      <label><input type="checkbox" id="removeBlack" /> Remove black background</label>
-      <label>Threshold <input type="number" id="removeBlackThresh" value="28" min="0" max="128" style="width:5rem" /></label>
+
+    <div class="section">
+      <h3 style="margin:.25rem 0 .5rem">Preview</h3>
+      <div id="lottieContainer" class="preview"></div>
+      <div class="hint">This is a live preview of the generated JSON (embedded PNGs).</div>
+    </div>
+
+    <div class="section">
+      <div class="hint">
+        If your JSON is large, that’s expected for **embedded PNG** frames. This is the most compatible format and matches GIF look/timing.
+      </div>
     </div>
   </div>
-
-  <div class="section row">
-    <button id="toLottieBtn" disabled>Convert to single JSON</button>
-  </div>
-
-  <div class="section">
-    <h3>Preview</h3>
-    <div id="lottieContainer" style="display:none"></div>
-  </div>
-
-  <div class="hint">
-    Tip: For the smallest JSON, use WebP + quantization + modest max size (e.g., 256–512 px).
-  </div>
-</div>
 
 <script type="module">
 import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
 import lottie from 'https://esm.sh/lottie-web';
-import * as IQ from 'https://esm.sh/image-q@4.0.0';
 
 const $ = id => document.getElementById(id);
-const fileInput = $('fileInput');
-const fileNameInput = $('fileNameInput');
-const embedFormat = $('embedFormat');
-const webpQ = $('webpQ');
-const maxW = $('maxW');
-const maxH = $('maxH');
-const useQuant = $('useQuant');
+const fileInput   = $('fileInput');
+const baseName    = $('baseName');
+const convertBtn  = $('convertBtn');
+const resetBtn    = $('resetBtn');
+const lottieDiv   = $('lottieContainer');
+const statusEl    = $('status');
 const removeBlack = $('removeBlack');
-const removeBlackThresh = $('removeBlackThresh');
-const toLottieBtn = $('toLottieBtn');
-const lottieContainer = $('lottieContainer');
+const blackThresh = $('blackThresh');
+const maxW        = $('maxW');
+const maxH        = $('maxH');
 
 let gifFrames = null;
+let lottiePlayer = null;
+
+function setStatus(msg, isError=false){
+  statusEl.textContent = msg;
+  statusEl.className = isError ? 'hint danger' : 'hint';
+}
+
+function resetAll(){
+  gifFrames = null;
+  convertBtn.disabled = true;
+  setStatus('Load a GIF to begin.');
+  lottieDiv.innerHTML = '';
+  if (lottiePlayer) { try { lottiePlayer.destroy(); } catch(_){} lottiePlayer = null; }
+  fileInput.value = '';
+}
+
+resetBtn.addEventListener('click', resetAll);
 
 fileInput.addEventListener('change', async () => {
-  const f = fileInput.files[0];
+  resetPreviewOnly();
+  const f = fileInput.files?.[0];
   if (!f) return;
-  if (f.size > 100*1024*1024) { alert('Max 100MB'); fileInput.value=''; return; }
-  const buf = await f.arrayBuffer();
-  gifFrames = decompressFrames(parseGIF(buf), true);
-  toLottieBtn.disabled = !gifFrames;
+  if (f.size > 100 * 1024 * 1024) {
+    setStatus('File too large (max 100 MB).', true);
+    fileInput.value = '';
+    return;
+  }
+  try {
+    setStatus('Parsing GIF…');
+    const buf = await f.arrayBuffer();
+    const gif = parseGIF(buf);
+    gifFrames = decompressFrames(gif, true); // builds frame patches with disposal handled
+    convertBtn.disabled = !gifFrames?.length;
+    setStatus(`Loaded ${gifFrames.length} frames. Ready to convert.`);
+  } catch (e) {
+    console.error(e);
+    setStatus('Failed to read GIF. Is the file valid?', true);
+    convertBtn.disabled = true;
+  }
 });
 
-toLottieBtn.addEventListener('click', async () => {
-  if (!gifFrames) return;
-  const opts = {
-    format: embedFormat.value,      // 'webp' | 'png'
-    webpQ: Math.max(0, Math.min(1, parseFloat(webpQ.value))),
-    maxW: parseInt(maxW.value,10),
-    maxH: parseInt(maxH.value,10),
-    quantize: useQuant.checked,
-    removeBlack: removeBlack.checked,
-    blackThresh: parseInt(removeBlackThresh.value,10)
-  };
-  const json = await gifToEmbeddedLottie(gifFrames, opts);
-  previewLottie(json);
-  const name = (fileNameInput.value || 'animation') + '.json';
-  downloadText(JSON.stringify(json, null, 2), name);
+function resetPreviewOnly(){
+  lottieDiv.innerHTML = '';
+  if (lottiePlayer) { try { lottiePlayer.destroy(); } catch(_){} lottiePlayer = null; }
+}
+
+convertBtn.addEventListener('click', async () => {
+  if (!gifFrames?.length) return;
+  convertBtn.disabled = true;
+  setStatus('Converting to JSON…');
+
+  try {
+    const json = await gifToLottieEmbeddedPNG(gifFrames, {
+      maxW: parseInt(maxW.value,10) || 4096,
+      maxH: parseInt(maxH.value,10) || 4096,
+      removeBlack: !!removeBlack.checked,
+      blackThresh: parseInt(blackThresh.value,10) || 0
+    });
+
+    // Preview
+    lottieDiv.innerHTML = '';
+    lottiePlayer = lottie.loadAnimation({
+      container: lottieDiv,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      animationData: json
+    });
+
+    // Download
+    const name = (baseName.value || 'animation') + '.json';
+    const blob = new Blob([JSON.stringify(json, null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+
+    setStatus('Done. Previewing JSON and downloaded.');
+  } catch (e) {
+    console.error(e);
+    setStatus('Conversion failed. See console for details.', true);
+  } finally {
+    convertBtn.disabled = false;
+  }
 });
 
-function previewLottie(data){
-  lottieContainer.innerHTML = '';
-  lottie.loadAnimation({ container: lottieContainer, renderer: 'svg', loop: true, autoplay: true, animationData: data });
-  lottieContainer.style.display = 'block';
-}
+/* ======== Core conversion ======== */
 
-function downloadText(text, filename){
-  const blob = new Blob([text], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-}
-
-/* ===== Frame processing ===== */
-function renderGifCanvases(frames){
+function rebuildGifFramesToCanvases(frames){
+  // Compose frames considering offsets; gifuct-js provides patches and dims
   const w = frames[0].dims.width, h = frames[0].dims.height;
-  const tmp = document.createElement('canvas'); tmp.width=w; tmp.height=h;
-  const tctx = tmp.getContext('2d', { willReadFrequently:true });
+  const comp = document.createElement('canvas'); comp.width = w; comp.height = h;
+  const compCtx = comp.getContext('2d');
 
-  return frames.map(f=>{
-    tctx.clearRect(0,0,w,h);
-    tctx.putImageData(new ImageData(new Uint8ClampedArray(f.patch), f.dims.width, f.dims.height), f.dims.left, f.dims.top);
-    const c = document.createElement('canvas'); c.width=w; c.height=h;
-    const ctx = c.getContext('2d');
-    ctx.drawImage(tmp,0,0);
+  return frames.map(f => {
+    // clear/compose as full frame
+    compCtx.clearRect(0,0,w,h);
+    compCtx.putImageData(
+      new ImageData(new Uint8ClampedArray(f.patch), f.dims.width, f.dims.height),
+      f.dims.left, f.dims.top
+    );
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(comp, 0, 0);
     return c;
   });
 }
 
-function resizeCanvasFit(srcCanvas, maxW, maxH){
-  const sw = srcCanvas.width, sh = srcCanvas.height;
+function downscale(canvas, maxW, maxH){
+  const sw = canvas.width, sh = canvas.height;
   const scale = Math.min(maxW/sw, maxH/sh, 1);
-  if (scale === 1) return srcCanvas;
-  const dw = Math.max(1, Math.round(sw*scale));
-  const dh = Math.max(1, Math.round(sh*scale));
-  const c = document.createElement('canvas'); c.width = dw; c.height = dh;
-  const ctx = c.getContext('2d');
+  if (scale >= 1) return canvas;
+  const dw = Math.max(1, Math.round(sw * scale));
+  const dh = Math.max(1, Math.round(sh * scale));
+  const out = document.createElement('canvas'); out.width = dw; out.height = dh;
+  const ctx = out.getContext('2d');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(srcCanvas, 0, 0, dw, dh);
-  return c;
+  ctx.drawImage(canvas, 0, 0, dw, dh);
+  return out;
 }
 
-function applyChromaKeyBlack(canvas, threshold){
-  const ctx = canvas.getContext('2d');
+function chromaKeyBlackInPlace(canvas, threshold){
+  const ctx = canvas.getContext('2d', { willReadFrequently:true });
   const img = ctx.getImageData(0,0,canvas.width,canvas.height);
   const d = img.data;
-  for(let i=0;i<d.length;i+=4){
+  for (let i=0;i<d.length;i+=4){
     if (d[i] <= threshold && d[i+1] <= threshold && d[i+2] <= threshold) d[i+3] = 0;
   }
   ctx.putImageData(img,0,0);
 }
 
-/* Optional: image-q v4 quantization (safe) */
-function quantizeCanvasInPlace(canvas, paletteSize=64){
-  const ctx = canvas.getContext('2d');
-  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-
-  const pc = IQ.utils.PointContainer.fromUint8Array(img.data, canvas.width, canvas.height);
-  const distance = new IQ.distance.Euclidean();
-  const WuQ = (IQ.quantization && IQ.quantization.WuQuant) || (IQ.image && IQ.image.quantization && IQ.image.quantization.WuQuant);
-  const NeuQ = (IQ.quantization && IQ.quantization.NeuQuant) || (IQ.image && IQ.image.quantization && IQ.image.quantization.NeuQuant);
-  const QuantizerClass = WuQ || NeuQ;
-  if (!QuantizerClass) throw new Error('image-q quantizer not found');
-
-  const quantizer = new QuantizerClass(distance, paletteSize);
-  const palette = quantizer.quantize(pc);
-
-  const Nearest = (IQ.image && IQ.image.NearestColor) || (IQ.image && IQ.image.nearestColor);
-  if (!Nearest) throw new Error('image-q NearestColor not found');
-
-  const mapper = new Nearest(distance);
-  const apply = IQ.applyPalette || (IQ.utils && IQ.utils.applyPalette);
-  if (!apply) throw new Error('image-q applyPalette not found');
-
-  const reducedPC = apply(pc, palette, mapper);
-  const reduced = reducedPC.toUint8Array();
-  ctx.putImageData(new ImageData(reduced, canvas.width, canvas.height), 0, 0);
+function tinyHash(canvas){
+  // rough perceptual-ish hash to dedupe consecutive identical frames
+  const s = 16;
+  const h = document.createElement('canvas'); h.width = s; h.height = s;
+  const ctx = h.getContext('2d');
+  ctx.drawImage(canvas, 0, 0, s, s);
+  return h.toDataURL('image/png');
 }
 
-/* tiny hash to merge identical consecutive frames */
-function hashCanvas(canvas){
-  const s=16;
-  const c=document.createElement('canvas'); c.width=s; c.height=s;
-  const ctx=c.getContext('2d'); ctx.drawImage(canvas,0,0,s,s);
-  return c.toDataURL('image/webp',0.5);
-}
+async function gifToLottieEmbeddedPNG(framesRaw, { maxW, maxH, removeBlack, blackThresh }){
+  // 1) Rebuild full frames
+  const full = rebuildGifFramesToCanvases(framesRaw);
 
-/* ===== GIF ➜ Lottie (single JSON, embedded) ===== */
-async function gifToEmbeddedLottie(framesRaw, opts){
-  // 1) Build full frames
-  const canvasesFull = renderGifCanvases(framesRaw);
-
-  // 2) Downscale / remove black / quantize
-  const canvases = canvasesFull.map(c => {
-    const r = resizeCanvasFit(c, opts.maxW, opts.maxH);
-    if (opts.removeBlack) applyChromaKeyBlack(r, opts.blackThresh);
-    if (opts.quantize) {
-      try { quantizeCanvasInPlace(r, 48); } catch(e){ console.warn('Quantization skipped:', e); }
-    }
+  // 2) Downscale + optional black removal
+  const processed = full.map(c => {
+    const r = downscale(c, maxW, maxH);
+    if (removeBlack) chromaKeyBlackInPlace(r, blackThresh);
     return r;
   });
 
-  // 3) Deduplicate consecutive identical frames
-  const delays = framesRaw.map(f => (f.delay || 10) * 10); // ms
-  const uniqueCanvases = [];
-  const uniqueDelays = [];
+  // 3) Merge consecutive identical frames to reduce size
+  const delaysMs = framesRaw.map(f => (f.delay || 10) * 10);
+  const frames = [];
+  const delays = [];
   let lastHash = null;
-  for (let i=0;i<canvases.length;i++){
-    const h = hashCanvas(canvases[i]);
-    if (h === lastHash && uniqueCanvases.length){
-      uniqueDelays[uniqueDelays.length-1] += delays[i];
+
+  for (let i=0;i<processed.length;i++){
+    const h = tinyHash(processed[i]);
+    if (h === lastHash && frames.length){
+      delays[delays.length-1] += delaysMs[i];
     } else {
-      uniqueCanvases.push(canvases[i]);
-      uniqueDelays.push(delays[i]);
+      frames.push(processed[i]);
+      delays.push(delaysMs[i]);
       lastHash = h;
     }
   }
 
-  // 4) Encode to data URLs (embedded)
-  const w = uniqueCanvases[0].width, h = uniqueCanvases[0].height;
-  const fr = 30; // logical framerate; timing comes from ip/op
-  const layers = [];
+  // 4) Encode each frame to PNG data URL (most compatible; matches “as before”)
+  const w = frames[0].width, h = frames[0].height;
+  const fr = 30; // logical frame rate; exact timing via ip/op
   const assets = [];
+  const layers = [];
   let t = 0;
 
-  for (let i=0;i<uniqueCanvases.length;i++){
-    const c = uniqueCanvases[i];
-    let dataURL;
-
-    if (opts.format === 'webp') {
-      dataURL = await new Promise(res => c.toBlob(b => {
-        const r = new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(b);
-      }, 'image/webp', opts.webpQ));
-    } else {
-      dataURL = c.toDataURL('image/png'); // bigger but “like GIF”
-    }
-
+  for (let i=0;i<frames.length;i++){
+    const dataURL = frames[i].toDataURL('image/png'); // embedded PNG
     const id = `img_${i}`;
-    assets.push({ id, w, h, p: dataURL, e: 1 }); // embedded data URL
+    assets.push({ id, w, h, p: dataURL, e: 1 });
 
     const ip = Math.round((t/1000)*fr);
-    const op = Math.round(((t+uniqueDelays[i])/1000)*fr);
+    const op = Math.round(((t + delays[i]) / 1000) * fr);
     layers.push({
       ddd:0, ind:i+1, ty:2, refId:id,
-      ks:{ o:{a:0,k:100}, r:{a:0,k:0}, p:{a:0,k:[w/2,h/2,0]}, a:{a:0,k:[w/2,h/2,0]}, s:{a:0,k:[100,100,100]} },
+      ks:{
+        o:{a:0,k:100},
+        r:{a:0,k:0},
+        p:{a:0,k:[w/2, h/2, 0]},
+        a:{a:0,k:[w/2, h/2, 0]},
+        s:{a:0,k:[100,100,100]}
+      },
       ip, op, st:0, bm:0
     });
-    t += uniqueDelays[i];
+    t += delays[i];
   }
 
-  return { v:"5.7.4", fr, ip:0, op:layers.length ? layers[layers.length-1].op : 0, w, h, nm:"GIF2Lottie Embedded", ddd:0, assets, layers };
+  return {
+    v:"5.7.4", fr, ip:0, op: layers.length ? layers[layers.length-1].op : 0,
+    w, h, nm:"GIF2Lottie PNG Embedded", ddd:0, assets, layers
+  };
 }
 </script>
 </body>
