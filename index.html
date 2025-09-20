@@ -3,30 +3,42 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GIF ➜ Lottie (Single JSON)</title>
+<title>GIF ➜ Lottie JSON (Optimized, Single File)</title>
 <style>
   :root { color-scheme: dark; }
-  body { background:#121212; color:#e0e0e0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji"; margin:0; padding:2rem; display:flex; justify-content:center; }
-  .card { width: min(860px, 94vw); background:#1e1e1e; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.4); padding:24px; }
+  body {
+    background:#121212; color:#e0e0e0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    margin:0; padding:2rem; display:flex; justify-content:center;
+  }
+  .card {
+    width:min(960px, 95vw); background:#1e1e1e; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.45);
+    padding:22px;
+  }
   h2 { margin:.25rem 0 1rem; color:#fafafa }
+  h3 { margin:.5rem 0 .6rem }
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center }
-  .section { margin:1.25rem 0 }
+  .section { margin:1rem 0 }
   input[type="text"], input[type="number"], select {
-    background:#2a2a2a; color:#fff; border:1px solid #444; border-radius:8px; padding:.5rem .65rem; font-size:15px;
+    background:#2a2a2a; color:#fff; border:1px solid #444; border-radius:8px; padding:.48rem .6rem; font-size:15px;
   }
   button {
     background:#2196f3; color:#fff; border:0; border-radius:10px; padding:.6rem 1.1rem; font-weight:600; cursor:pointer;
   }
   button:disabled { background:#555; cursor:not-allowed }
   button:hover:not(:disabled) { background:#1976d2 }
-  .preview { border:1px solid #333; border-radius:10px; height:320px; background:#121212; }
-  .hint { color:#aaa; font-size:.9rem }
+  .preview {
+    border:1px solid #333; border-radius:10px; height:360px; background:#121212;
+  }
+  .hint { color:#aaa; font-size:.92rem }
   .danger { color:#ff7676 }
+  progress { width:260px; height:10px }
+  .kv { display:inline-block; min-width:120px; color:#bbb }
+  .pill { padding:.2rem .6rem; border:1px solid #444; border-radius:999px; font-size:.85rem; color:#bbb; }
 </style>
 </head>
 <body>
   <div class="card">
-    <h2>GIF ➜ Lottie (Single JSON)</h2>
+    <h2>GIF ➜ Lottie JSON (Single File, Optimized)</h2>
 
     <div class="section row">
       <input id="fileInput" type="file" accept=".gif" />
@@ -35,12 +47,38 @@
       <button id="resetBtn">Reset</button>
     </div>
 
-    <div class="section row">
-      <label><input type="checkbox" id="removeBlack"> Remove black background</label>
-      <label>Threshold <input type="number" id="blackThresh" value="28" min="0" max="128" style="width:5rem"></label>
-      <label>Max Width <input type="number" id="maxW" value="512" min="16" style="width:6rem"></label>
-      <label>Max Height <input type="number" id="maxH" value="512" min="16" style="width:6rem"></label>
-      <span class="hint">Downscales to fit box (keeps aspect ratio). Leave as original size by setting very large limits.</span>
+    <div class="section">
+      <h3>Output</h3>
+      <div class="row">
+        <label>Embedded Format
+          <select id="embedFormat">
+            <option value="webp">WebP (smaller JSON)</option>
+            <option value="png">PNG (bigger, max compatibility)</option>
+          </select>
+        </label>
+        <label>WebP Quality
+          <input type="number" id="webpQ" value="0.7" min="0" max="1" step="0.05" style="width:6rem" />
+        </label>
+        <label>Target Size (KB)
+          <input type="number" id="targetKB" value="0" min="0" step="50" style="width:7rem" />
+        </label>
+        <span class="pill">Set >0 to auto-tune quality (WebP only)</span>
+      </div>
+      <div class="row">
+        <label>Max Width <input type="number" id="maxW" value="512" min="16" style="width:6rem" /></label>
+        <label>Max Height <input type="number" id="maxH" value="512" min="16" style="width:6rem" /></label>
+        <span class="pill">Downscale to fit (keeps aspect)</span>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="useQuant" checked /> Quantize colors before encode</label>
+        <label><input type="checkbox" id="removeBlack" /> Remove black background</label>
+        <label>Threshold <input type="number" id="blackThresh" value="28" min="0" max="128" style="width:5rem" /></label>
+      </div>
+      <div class="row" id="progressWrap" style="display:none">
+        <span class="kv" id="progLabel">Encoding…</span>
+        <progress id="prog" max="100" value="0"></progress>
+        <span class="kv" id="progDetail"></span>
+      </div>
     </div>
 
     <div class="section">
@@ -50,20 +88,16 @@
     <div class="section">
       <h3 style="margin:.25rem 0 .5rem">Preview</h3>
       <div id="lottieContainer" class="preview"></div>
-      <div class="hint">This is a live preview of the generated JSON (embedded PNGs).</div>
-    </div>
-
-    <div class="section">
-      <div class="hint">
-        If your JSON is large, that’s expected for **embedded PNG** frames. This is the most compatible format and matches GIF look/timing.
-      </div>
+      <div class="hint">Live preview of the generated JSON (same data you download).</div>
     </div>
   </div>
 
 <script type="module">
 import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
 import lottie from 'https://esm.sh/lottie-web';
+import * as IQ from 'https://esm.sh/image-q@4.0.0'; // optional quantization
 
+/* ---------- Elements ---------- */
 const $ = id => document.getElementById(id);
 const fileInput   = $('fileInput');
 const baseName    = $('baseName');
@@ -71,32 +105,54 @@ const convertBtn  = $('convertBtn');
 const resetBtn    = $('resetBtn');
 const lottieDiv   = $('lottieContainer');
 const statusEl    = $('status');
-const removeBlack = $('removeBlack');
-const blackThresh = $('blackThresh');
+const embedFormat = $('embedFormat');
+const webpQ       = $('webpQ');
+const targetKB    = $('targetKB');
 const maxW        = $('maxW');
 const maxH        = $('maxH');
+const useQuant    = $('useQuant');
+const removeBlack = $('removeBlack');
+const blackThresh = $('blackThresh');
+const progWrap    = $('progressWrap');
+const prog        = $('prog');
+const progLabel   = $('progLabel');
+const progDetail  = $('progDetail');
 
+/* ---------- State ---------- */
 let gifFrames = null;
+let parsedGif = null;
+let gifW = 0, gifH = 0;
 let lottiePlayer = null;
 
+/* ---------- UI helpers ---------- */
 function setStatus(msg, isError=false){
   statusEl.textContent = msg;
   statusEl.className = isError ? 'hint danger' : 'hint';
 }
-
-function resetAll(){
-  gifFrames = null;
-  convertBtn.disabled = true;
-  setStatus('Load a GIF to begin.');
+function resetPreview(){
   lottieDiv.innerHTML = '';
   if (lottiePlayer) { try { lottiePlayer.destroy(); } catch(_){} lottiePlayer = null; }
-  fileInput.value = '';
 }
-
+function resetAll(){
+  gifFrames = null; parsedGif = null; gifW=0; gifH=0;
+  convertBtn.disabled = true;
+  setStatus('Load a GIF to begin.');
+  resetPreview();
+  fileInput.value = '';
+  showProgress(false);
+}
 resetBtn.addEventListener('click', resetAll);
 
+function showProgress(show, label='', val=0, detail=''){
+  progWrap.style.display = show ? 'flex' : 'none';
+  if (show){
+    prog.value = val; progLabel.textContent = label || 'Encoding…'; progDetail.textContent = detail || '';
+  }
+}
+
+/* ---------- Load GIF ---------- */
 fileInput.addEventListener('change', async () => {
-  resetPreviewOnly();
+  resetPreview();
   const f = fileInput.files?.[0];
   if (!f) return;
   if (f.size > 100 * 1024 * 1024) {
@@ -107,10 +163,12 @@ fileInput.addEventListener('change', async () => {
   try {
     setStatus('Parsing GIF…');
     const buf = await f.arrayBuffer();
-    const gif = parseGIF(buf);
-    gifFrames = decompressFrames(gif, true); // builds frame patches with disposal handled
+    parsedGif = parseGIF(buf);
+    gifFrames = decompressFrames(parsedGif, true);
+    gifW = parsedGif.lsd.width;
+    gifH = parsedGif.lsd.height;
     convertBtn.disabled = !gifFrames?.length;
-    setStatus(`Loaded ${gifFrames.length} frames. Ready to convert.`);
+    setStatus(`Loaded ${gifFrames.length} frames (${gifW}×${gifH}). Ready to convert.`);
   } catch (e) {
     console.error(e);
     setStatus('Failed to read GIF. Is the file valid?', true);
@@ -118,29 +176,38 @@ fileInput.addEventListener('change', async () => {
   }
 });
 
-function resetPreviewOnly(){
-  lottieDiv.innerHTML = '';
-  if (lottiePlayer) { try { lottiePlayer.destroy(); } catch(_){} lottiePlayer = null; }
-}
-
+/* ---------- Convert ---------- */
 convertBtn.addEventListener('click', async () => {
   if (!gifFrames?.length) return;
   convertBtn.disabled = true;
   setStatus('Converting to JSON…');
+  showProgress(true, 'Preprocessing…', 0);
 
   try {
-    const json = await gifToLottieEmbeddedPNG(gifFrames, {
+    const json = await gifToLottieSingleJSON(gifFrames, {
+      logicalW: gifW, logicalH: gifH,
       maxW: parseInt(maxW.value,10) || 4096,
       maxH: parseInt(maxH.value,10) || 4096,
+      format: embedFormat.value, // 'webp' | 'png'
+      webpQ: Math.max(0, Math.min(1, parseFloat(webpQ.value))),
+      targetKB: Math.max(0, parseInt(targetKB.value,10) || 0),
+      quantize: !!useQuant.checked,
       removeBlack: !!removeBlack.checked,
-      blackThresh: parseInt(blackThresh.value,10) || 0
+      blackThresh: parseInt(blackThresh.value,10) || 0,
+      onProgress: (stage, i, total) => {
+        if (stage === 'compose') showProgress(true, 'Compositing frames…', Math.round((i/total)*20), `${i}/${total}`);
+        if (stage === 'resize')  showProgress(true, 'Resizing frames…',     20 + Math.round((i/total)*20), `${i}/${total}`);
+        if (stage === 'quant')   showProgress(true, 'Quantizing colors…',   40 + Math.round((i/total)*20), `${i}/${total}`);
+        if (stage === 'encode')  showProgress(true, 'Encoding images…',     60 + Math.round((i/total)*35), `${i}/${total}`);
+        if (stage === 'assemble')showProgress(true, 'Assembling JSON…',     95);
+      }
     });
 
-    // Preview
-    lottieDiv.innerHTML = '';
+    // Preview (use canvas renderer for sharp PNG/WebP)
+    resetPreview();
     lottiePlayer = lottie.loadAnimation({
       container: lottieDiv,
-      renderer: 'svg',
+      renderer: 'canvas',
       loop: true,
       autoplay: true,
       animationData: json
@@ -154,34 +221,56 @@ convertBtn.addEventListener('click', async () => {
     a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
 
-    setStatus('Done. Previewing JSON and downloaded.');
+    const prettySize = (JSON.stringify(json).length/1024).toFixed(0);
+    setStatus(`Done. JSON ~ ${prettySize} KB. Previewing and downloaded.`);
   } catch (e) {
     console.error(e);
     setStatus('Conversion failed. See console for details.', true);
   } finally {
     convertBtn.disabled = false;
+    showProgress(false);
   }
 });
 
-/* ======== Core conversion ======== */
+/* ---------- Core conversion pipeline ---------- */
 
-function rebuildGifFramesToCanvases(frames){
-  // Compose frames considering offsets; gifuct-js provides patches and dims
-  const w = frames[0].dims.width, h = frames[0].dims.height;
-  const comp = document.createElement('canvas'); comp.width = w; comp.height = h;
-  const compCtx = comp.getContext('2d');
+// Compose frames to full logical canvas with disposal handling
+function composeGifFramesToCanvases(frames, logicalW, logicalH, onProgress){
+  const comp = document.createElement('canvas'); comp.width = logicalW; comp.height = logicalH;
+  const ctx  = comp.getContext('2d', { willReadFrequently: true });
 
-  return frames.map(f => {
-    // clear/compose as full frame
-    compCtx.clearRect(0,0,w,h);
-    compCtx.putImageData(
-      new ImageData(new Uint8ClampedArray(f.patch), f.dims.width, f.dims.height),
-      f.dims.left, f.dims.top
-    );
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    c.getContext('2d').drawImage(comp, 0, 0);
-    return c;
+  let prevImageData = null;
+  const outs = [];
+
+  frames.forEach((f, idx) => {
+    const { left, top, width, height } = f.dims;
+    const disposal = f.disposalType || 0; // 0/1 none, 2 bg, 3 previous
+
+    // Save state for disposal=3 BEFORE drawing patch
+    if (disposal === 3) {
+      try { prevImageData = ctx.getImageData(0, 0, logicalW, logicalH); } catch(_) { prevImageData = null; }
+    }
+
+    // Draw current patch (already includes alpha)
+    const patch = new ImageData(new Uint8ClampedArray(f.patch), width, height);
+    ctx.putImageData(patch, left, top);
+
+    // Snapshot composed frame
+    const out = document.createElement('canvas'); out.width = logicalW; out.height = logicalH;
+    out.getContext('2d').drawImage(comp, 0, 0);
+    outs.push(out);
+
+    // Apply disposal for next frame
+    if (disposal === 2) {
+      ctx.clearRect(left, top, width, height);
+    } else if (disposal === 3 && prevImageData) {
+      ctx.putImageData(prevImageData, 0, 0);
+    }
+
+    onProgress && onProgress('compose', idx+1, frames.length);
   });
+
+  return outs;
 }
 
 function downscale(canvas, maxW, maxH){
@@ -198,85 +287,166 @@ function downscale(canvas, maxW, maxH){
   return out;
 }
 
-function chromaKeyBlackInPlace(canvas, threshold){
+function chromaKeyBlack(canvas, threshold){
   const ctx = canvas.getContext('2d', { willReadFrequently:true });
   const img = ctx.getImageData(0,0,canvas.width,canvas.height);
   const d = img.data;
   for (let i=0;i<d.length;i+=4){
-    if (d[i] <= threshold && d[i+1] <= threshold && d[i+2] <= threshold) d[i+3] = 0;
+    if (d[i]<=threshold && d[i+1]<=threshold && d[i+2]<=threshold) d[i+3]=0;
   }
   ctx.putImageData(img,0,0);
 }
 
 function tinyHash(canvas){
-  // rough perceptual-ish hash to dedupe consecutive identical frames
-  const s = 16;
-  const h = document.createElement('canvas'); h.width = s; h.height = s;
-  const ctx = h.getContext('2d');
-  ctx.drawImage(canvas, 0, 0, s, s);
-  return h.toDataURL('image/png');
+  const s=16;
+  const h=document.createElement('canvas'); h.width=s; h.height=s;
+  const ctx=h.getContext('2d'); ctx.drawImage(canvas,0,0,s,s);
+  return h.toDataURL('image/webp',0.5);
 }
 
-async function gifToLottieEmbeddedPNG(framesRaw, { maxW, maxH, removeBlack, blackThresh }){
-  // 1) Rebuild full frames
-  const full = rebuildGifFramesToCanvases(framesRaw);
+// image-q quantization (safe for v4 builds)
+function quantizeCanvasInPlace(canvas, paletteSize=48){
+  const ctx = canvas.getContext('2d');
+  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+
+  const pc = IQ.utils.PointContainer.fromUint8Array(img.data, canvas.width, canvas.height);
+  const distance = new IQ.distance.Euclidean();
+  const WuQ  = (IQ.quantization && IQ.quantization.WuQuant) || (IQ.image && IQ.image.quantization && IQ.image.quantization.WuQuant);
+  const NeuQ = (IQ.quantization && IQ.quantization.NeuQuant) || (IQ.image && IQ.image.quantization && IQ.image.quantization.NeuQuant);
+  const Quantizer = WuQ || NeuQ;
+  if (!Quantizer) throw new Error('image-q quantizer not found');
+
+  const quantizer = new Quantizer(distance, paletteSize);
+  const palette = quantizer.quantize(pc);
+
+  const Nearest = (IQ.image && IQ.image.NearestColor) || (IQ.image && IQ.image.nearestColor);
+  if (!Nearest) throw new Error('image-q NearestColor not found');
+
+  const mapper = new Nearest(distance);
+  const apply  = IQ.applyPalette || (IQ.utils && IQ.utils.applyPalette);
+  if (!apply) throw new Error('image-q applyPalette not found');
+
+  const reducedPC = apply(pc, palette, mapper);
+  const reduced = reducedPC.toUint8Array();
+  ctx.putImageData(new ImageData(reduced, canvas.width, canvas.height), 0, 0);
+}
+
+function canvasToDataURL(canvas, format, quality){
+  if (format === 'webp') {
+    return new Promise(res => canvas.toBlob(b => {
+      const r = new FileReader(); r.onload = () => res(r.result);
+      r.readAsDataURL(b);
+    }, 'image/webp', quality));
+  } else {
+    return Promise.resolve(canvas.toDataURL('image/png'));
+  }
+}
+
+async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12){
+  // Only for WebP. Sample a subset of frames, binary search quality to hit target size.
+  const idxs = [];
+  const step = Math.max(1, Math.floor(frames.length / sampleCount));
+  for (let i=0;i<frames.length; i+=step) idxs.push(i);
+  if (idxs[idxs.length-1] !== frames.length-1) idxs.push(frames.length-1);
+
+  let lo=0.1, hi=0.95, best=baseQuality, bestBytes=Infinity;
+  for (let iter=0; iter<6; iter++){
+    const mid = iter===0 ? baseQuality : (lo+hi)/2;
+    let total = 0;
+    for (const i of idxs){
+      const url = await canvasToDataURL(frames[i], 'webp', mid);
+      // estimate for all frames by average * frame count
+      total += (url.length * 3/4); // rough bytes from base64 length
+    }
+    const estBytes = (total / idxs.length) * frames.length;
+    if (Math.abs(estBytes - targetBytes) < Math.abs(bestBytes - targetBytes)){
+      best = mid; bestBytes = estBytes;
+    }
+    if (estBytes > targetBytes) hi = mid; else lo = mid;
+  }
+  return Math.max(0.05, Math.min(0.99, best));
+}
+
+async function gifToLottieSingleJSON(framesRaw, opts){
+  const {
+    logicalW, logicalH, maxW, maxH, format, webpQ, targetKB,
+    quantize, removeBlack, blackThresh, onProgress
+  } = opts;
+
+  // 1) Compose full logical frames with correct disposal handling
+  const composed = composeGifFramesToCanvases(framesRaw, logicalW, logicalH, onProgress);
 
   // 2) Downscale + optional black removal
-  const processed = full.map(c => {
+  const resized = composed.map((c, i) => {
     const r = downscale(c, maxW, maxH);
-    if (removeBlack) chromaKeyBlackInPlace(r, blackThresh);
+    if (removeBlack) chromaKeyBlack(r, blackThresh);
+    onProgress && onProgress('resize', i+1, composed.length);
     return r;
   });
 
-  // 3) Merge consecutive identical frames to reduce size
+  // 3) Merge consecutive identical frames
   const delaysMs = framesRaw.map(f => (f.delay || 10) * 10);
-  const frames = [];
-  const delays = [];
+  const uniq = [];
+  const uniqDelays = [];
   let lastHash = null;
 
-  for (let i=0;i<processed.length;i++){
-    const h = tinyHash(processed[i]);
-    if (h === lastHash && frames.length){
-      delays[delays.length-1] += delaysMs[i];
+  resized.forEach((c, i) => {
+    const h = tinyHash(c);
+    if (h === lastHash && uniq.length){
+      uniqDelays[uniqDelays.length-1] += delaysMs[i];
     } else {
-      frames.push(processed[i]);
-      delays.push(delaysMs[i]);
+      uniq.push(c);
+      uniqDelays.push(delaysMs[i]);
       lastHash = h;
+    }
+  });
+
+  // 4) Optional quantization (reduces colors → smaller PNG/WebP)
+  if (quantize) {
+    for (let i=0; i<uniq.length; i++){
+      try { quantizeCanvasInPlace(uniq[i], 48); } catch(e){ /* skip on errors */ }
+      onProgress && onProgress('quant', i+1, uniq.length);
     }
   }
 
-  // 4) Encode each frame to PNG data URL (most compatible; matches “as before”)
-  const w = frames[0].width, h = frames[0].height;
-  const fr = 30; // logical frame rate; exact timing via ip/op
+  // 5) (WebP only) Auto-size quality if targetKB provided
+  let finalQuality = webpQ;
+  const targetBytes = targetKB > 0 ? targetKB * 1024 : 0;
+  if (format === 'webp' && targetBytes > 0){
+    showProgress(true, 'Auto-sizing quality…');
+    finalQuality = await autosizeQuality(uniq, webpQ, targetBytes);
+  }
+
+  // 6) Encode frames to data URLs
+  const dataURLs = [];
+  for (let i=0; i<uniq.length; i++){
+    const url = await canvasToDataURL(uniq[i], format, finalQuality);
+    dataURLs.push(url);
+    onProgress && onProgress('encode', i+1, uniq.length);
+  }
+
+  // 7) Assemble Lottie JSON (image sequence with correct ip/op at fr=30)
+  onProgress && onProgress('assemble');
+  const w = uniq[0].width, h = uniq[0].height;
+  const fr = 30;
   const assets = [];
   const layers = [];
   let t = 0;
 
-  for (let i=0;i<frames.length;i++){
-    const dataURL = frames[i].toDataURL('image/png'); // embedded PNG
+  for (let i=0;i<dataURLs.length;i++){
     const id = `img_${i}`;
-    assets.push({ id, w, h, p: dataURL, e: 1 });
-
+    assets.push({ id, w, h, p: dataURLs[i], e: 1 }); // embedded data URL
     const ip = Math.round((t/1000)*fr);
-    const op = Math.round(((t + delays[i]) / 1000) * fr);
+    const op = Math.round(((t + uniqDelays[i])/1000) * fr);
     layers.push({
       ddd:0, ind:i+1, ty:2, refId:id,
-      ks:{
-        o:{a:0,k:100},
-        r:{a:0,k:0},
-        p:{a:0,k:[w/2, h/2, 0]},
-        a:{a:0,k:[w/2, h/2, 0]},
-        s:{a:0,k:[100,100,100]}
-      },
+      ks:{ o:{a:0,k:100}, r:{a:0,k:0}, p:{a:0,k:[w/2,h/2,0]}, a:{a:0,k:[w/2,h/2,0]}, s:{a:0,k:[100,100,100]} },
       ip, op, st:0, bm:0
     });
-    t += delays[i];
+    t += uniqDelays[i];
   }
 
-  return {
-    v:"5.7.4", fr, ip:0, op: layers.length ? layers[layers.length-1].op : 0,
-    w, h, nm:"GIF2Lottie PNG Embedded", ddd:0, assets, layers
-  };
+  return { v:"5.7.4", fr, ip:0, op: layers.length ? layers[layers.length-1].op : 0, w, h, nm:"GIF2Lottie (Embedded)", ddd:0, assets, layers };
 }
 </script>
 </body>
