@@ -52,7 +52,7 @@
       <div class="row">
         <label>Embedded Format
           <select id="embedFormat">
-            <option value="webp">WebP (smaller JSON)</option>
+            <option value="webp" selected>WebP (smaller JSON)</option>
             <option value="png">PNG (bigger, max compatibility)</option>
           </select>
         </label>
@@ -60,9 +60,9 @@
           <input type="number" id="webpQ" value="0.7" min="0" max="1" step="0.05" style="width:6rem" />
         </label>
         <label>Target Size (KB)
-          <input type="number" id="targetKB" value="0" min="0" step="50" style="width:7rem" />
+          <input type="number" id="targetKB" value="900" min="0" step="50" style="width:7rem" />
         </label>
-        <span class="pill">Set >0 to auto-tune quality (WebP only)</span>
+        <span class="pill">>0 auto-tunes WebP to hit target</span>
       </div>
       <div class="row">
         <label>Max Width <input type="number" id="maxW" value="512" min="16" style="width:6rem" /></label>
@@ -72,7 +72,8 @@
       <div class="row">
         <label><input type="checkbox" id="useQuant" checked /> Quantize colors before encode</label>
         <label><input type="checkbox" id="removeBlack" /> Remove black background</label>
-        <label>Threshold <input type="number" id="blackThresh" value="28" min="0" max="128" style="width:5rem" /></label>
+        <label>Threshold <input type="number" id="blackThresh" value="8" min="0" max="64" style="width:5rem" /></label>
+        <span class="pill">Use small threshold (4–10) for cleaner edges</span>
       </div>
       <div class="row" id="progressWrap" style="display:none">
         <span class="kv" id="progLabel">Encoding…</span>
@@ -203,7 +204,7 @@ convertBtn.addEventListener('click', async () => {
       }
     });
 
-    // Preview (use canvas renderer for sharp PNG/WebP)
+    // Preview (canvas renderer = sharper)
     resetPreview();
     lottiePlayer = lottie.loadAnimation({
       container: lottieDiv,
@@ -251,7 +252,7 @@ function composeGifFramesToCanvases(frames, logicalW, logicalH, onProgress){
       try { prevImageData = ctx.getImageData(0, 0, logicalW, logicalH); } catch(_) { prevImageData = null; }
     }
 
-    // Draw current patch (already includes alpha)
+    // Draw current patch (includes alpha)
     const patch = new ImageData(new Uint8ClampedArray(f.patch), width, height);
     ctx.putImageData(patch, left, top);
 
@@ -287,14 +288,70 @@ function downscale(canvas, maxW, maxH){
   return out;
 }
 
-function chromaKeyBlack(canvas, threshold){
-  const ctx = canvas.getContext('2d', { willReadFrequently:true });
-  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+/* --- Feathered black chroma key (no harsh halos) --- */
+function chromaKeyBlackFeather(canvas, thr = 8, soft = 10, spill = 0.25) {
+  // thr = start of full cut; soft = feather width; spill = desaturate near edge
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const d = img.data;
-  for (let i=0;i<d.length;i+=4){
-    if (d[i]<=threshold && d[i+1]<=threshold && d[i+2]<=threshold) d[i+3]=0;
+  const t0 = thr;
+  const t1 = thr + soft;
+
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i+1], b = d[i+2];
+    const a0 = d[i+3];
+    const m = Math.max(r, g, b); // distance from black
+
+    if (m <= t1) {
+      const a = (m <= t0) ? 0 : Math.round(((m - t0) / (t1 - t0)) * a0);
+      d[i+3] = a;
+
+      // spill reduction for semi-transparent edge pixels
+      if (a < a0 && spill > 0) {
+        const gray = (r + g + b) / 3;
+        d[i]   = Math.round(r * (1 - spill) + gray * spill);
+        d[i+1] = Math.round(g * (1 - spill) + gray * spill);
+        d[i+2] = Math.round(b * (1 - spill) + gray * spill);
+      }
+    }
   }
-  ctx.putImageData(img,0,0);
+  ctx.putImageData(img, 0, 0);
+}
+
+/* --- Defringe alpha edges (soften dark rings) --- */
+function defringeAlphaEdges(canvas, passes = 1) {
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  for (let p = 0; p < passes; p++) {
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    const copy = new Uint8ClampedArray(d);
+
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = (y * w + x) * 4;
+        const a = d[i + 3];
+        if (a > 0 && a < 255) {
+          let sr = 0, sg = 0, sb = 0, c = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (!dx && !dy) continue;
+              const j = ((y + dy) * w + (x + dx)) * 4;
+              if (d[j + 3] === 255) { sr += d[j]; sg += d[j+1]; sb += d[j+2]; c++; }
+            }
+          }
+          if (c) {
+            copy[i]   = Math.round(sr / c);
+            copy[i+1] = Math.round(sg / c);
+            copy[i+2] = Math.round(sb / c);
+          }
+        }
+      }
+    }
+    img.data.set(copy);
+    ctx.putImageData(img, 0, 0);
+  }
 }
 
 function tinyHash(canvas){
@@ -355,7 +412,6 @@ async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12)
     let total = 0;
     for (const i of idxs){
       const url = await canvasToDataURL(frames[i], 'webp', mid);
-      // estimate for all frames by average * frame count
       total += (url.length * 3/4); // rough bytes from base64 length
     }
     const estBytes = (total / idxs.length) * frames.length;
@@ -364,7 +420,7 @@ async function autosizeQuality(frames, baseQuality, targetBytes, sampleCount=12)
     }
     if (estBytes > targetBytes) hi = mid; else lo = mid;
   }
-  return Math.max(0.05, Math.min(0.99, best));
+  return Math.max(0.05, Math.min(0.95, best));
 }
 
 async function gifToLottieSingleJSON(framesRaw, opts){
@@ -376,10 +432,13 @@ async function gifToLottieSingleJSON(framesRaw, opts){
   // 1) Compose full logical frames with correct disposal handling
   const composed = composeGifFramesToCanvases(framesRaw, logicalW, logicalH, onProgress);
 
-  // 2) Downscale + optional black removal
+  // 2) Downscale + optional black removal (feathered) + defringe
   const resized = composed.map((c, i) => {
     const r = downscale(c, maxW, maxH);
-    if (removeBlack) chromaKeyBlack(r, blackThresh);
+    if (removeBlack) {
+      chromaKeyBlackFeather(r, Math.max(0, blackThresh - 2), 10, 0.25);
+      defringeAlphaEdges(r, 1);
+    }
     onProgress && onProgress('resize', i+1, composed.length);
     return r;
   });
@@ -404,7 +463,7 @@ async function gifToLottieSingleJSON(framesRaw, opts){
   // 4) Optional quantization (reduces colors → smaller PNG/WebP)
   if (quantize) {
     for (let i=0; i<uniq.length; i++){
-      try { quantizeCanvasInPlace(uniq[i], 48); } catch(e){ /* skip on errors */ }
+      try { quantizeCanvasInPlace(uniq[i], 56); } catch(e){ /* safe skip */ }
       onProgress && onProgress('quant', i+1, uniq.length);
     }
   }
