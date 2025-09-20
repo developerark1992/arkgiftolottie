@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Animation Converter - GIF & Lottie</title>
+<title>Animation Converter - GIF & Lottie (KB-friendly)</title>
 <link rel="icon" type="image/png" href="favicon.png" />
 <style>
   body { background:#121212; color:#e0e0e0; font-family:'Segoe UI',sans-serif; padding:2rem; margin:0; display:flex; justify-content:center; }
-  .card { background:#1e1e1e; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); padding:2rem; width:90%; max-width:700px }
+  .card { background:#1e1e1e; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); padding:2rem; width:90%; max-width:800px }
   h2,h3 { margin:0 0 1rem; color:#fafafa }
   .section { margin-bottom:1.5rem }
   input, button, select, label { font-size:1rem; margin-right:.5rem; margin-top:.3rem; }
@@ -31,11 +31,13 @@
   .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap }
   .footer { margin-top:2rem; text-align:center; font-size:.9rem; color:#888 }
   .footer a { color:#2196f3; text-decoration:none }
+  .chip { background:#2b2b2b; border:1px solid #444; border-radius:999px; padding:.25rem .6rem; font-size:.85rem; color:#bbb }
+  .hint { font-size:.85rem; color:#aaa }
 </style>
 </head>
 <body>
 <div class="card">
-  <h2>ARK Animation Converter - GIF & Lottie - 2025</h2>
+  <h2>ARK Animation Converter — GIF & Lottie — 2025 (KB-friendly)</h2>
 
   <div class="section row">
     <input type="file" id="fileInput" accept=".gif,.json" />
@@ -58,6 +60,36 @@
     <label>Threshold:
       <input type="number" id="removeBlackThresh" value="28" min="0" max="128" />
     </label>
+  </div>
+
+  <!-- SIZE / QUALITY CONTROLS -->
+  <div class="section">
+    <h3>Size & Quality</h3>
+    <div class="row">
+      <label>Max Width:
+        <input type="number" id="maxW" value="512" min="32" step="1" style="width:6rem" />
+      </label>
+      <label>Max Height:
+        <input type="number" id="maxH" value="512" min="32" step="1" style="width:6rem" />
+      </label>
+      <span class="chip">Downscales frames to fit box while keeping aspect ratio.</span>
+    </div>
+    <div class="row">
+      <label>WebP Quality:
+        <input type="number" id="webpQ" value="0.7" min="0" max="1" step="0.05" style="width:6rem" />
+      </label>
+      <label><input type="checkbox" id="useQuant" checked /> Palette quantize before WebP</label>
+      <span class="chip">Lower quality/enable quantization → smaller files.</span>
+    </div>
+    <div class="row">
+      <label>Output Mode:
+        <select id="lottieOutputMode">
+          <option value="zip">Zipped (JSON + WebP images) — smallest</option>
+          <option value="embedded">Embedded (Base64 in JSON) — larger</option>
+        </select>
+      </label>
+      <span class="hint">Tip: “Zipped” keeps JSON tiny and compresses images properly.</span>
+    </div>
   </div>
 
   <div class="section row">
@@ -86,32 +118,42 @@
 </div>
 
 <script type="module">
+/* ===== External libs (ESM/CDN) ===== */
 import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
 import lottie from 'https://esm.sh/lottie-web';
+import * as IQ from 'https://esm.sh/image-q@4.0.0';           // for optional quantization
+import JSZip from 'https://esm.sh/jszip@3.10.1';
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
-
-const fileInput = document.getElementById('fileInput');
-const fileNameInput = document.getElementById('fileNameInput');
-const gifChromaSelect = document.getElementById('gifChromaSelect');
-const removeBlack = document.getElementById('removeBlack');
-const removeBlackThresh = document.getElementById('removeBlackThresh');
-const toGifBtn = document.getElementById('toGifBtn');
-const toLottieBtn = document.getElementById('toLottieBtn');
-const toVideoBtn = document.getElementById('toVideoBtn');
-const resetBtn = document.getElementById('resetBtn');
-const gifPreview = document.getElementById('gifPreview');
-const videoPreview = document.getElementById('videoPreview');
-const lottieContainer = document.getElementById('lottieContainer');
-
-let fileType = null, gifFrames = null, lottieData = null;
-
-// Load gif.js
+/* ===== Also load gif.js for Lottie->GIF path ===== */
 let gifLibReady = false;
 const gifScript = document.createElement('script');
 gifScript.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js";
 gifScript.onload = () => gifLibReady = true;
 document.head.appendChild(gifScript);
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+
+const $ = (id) => document.getElementById(id);
+const fileInput = $('fileInput');
+const fileNameInput = $('fileNameInput');
+const gifChromaSelect = $('gifChromaSelect');
+const removeBlack = $('removeBlack');
+const removeBlackThresh = $('removeBlackThresh');
+const toGifBtn = $('toGifBtn');
+const toLottieBtn = $('toLottieBtn');
+const toVideoBtn = $('toVideoBtn');
+const resetBtn = $('resetBtn');
+const gifPreview = $('gifPreview');
+const videoPreview = $('videoPreview');
+const lottieContainer = $('lottieContainer');
+
+const maxW = $('maxW');
+const maxH = $('maxH');
+const webpQ = $('webpQ');
+const useQuant = $('useQuant');
+const lottieOutputMode = $('lottieOutputMode');
+
+let fileType = null, gifFrames = null, lottieData = null;
 
 function resetAll() {
   gifPreview.style.display = 'none';
@@ -165,9 +207,9 @@ function previewLottie(data){
   lottieContainer.style.display='block';
 }
 
-// ==== Conversions ====
+/* ===== Conversions ===== */
 
-// Lottie → GIF
+// Lottie → GIF (unchanged)
 toGifBtn.addEventListener('click', async () => {
   if (!lottieData) return;
   if (!gifLibReady) { alert("GIF encoder not ready"); return; }
@@ -188,12 +230,23 @@ toGifBtn.addEventListener('click', async () => {
   gif.render();
 });
 
-// GIF → Lottie (preserve timing)
+// GIF → Lottie (size-optimized)
 toLottieBtn.addEventListener('click', async () => {
   if (!gifFrames) return;
-  const lottieJson = await buildLottieFromGif(gifFrames);
-  previewLottie(lottieJson);
-  autoDownload(new Blob([JSON.stringify(lottieJson,null,2)],{type:'application/json'}),(fileNameInput.value||'animation')+'.json');
+
+  const opts = {
+    maxW: parseInt(maxW.value,10),
+    maxH: parseInt(maxH.value,10),
+    webpQ: Math.max(0, Math.min(1, parseFloat(webpQ.value))),
+    quantize: useQuant.checked,
+    mode: lottieOutputMode.value // 'zip' | 'embedded'
+  };
+
+  const { blob, previewJson } = await buildLottieFromGifOptimized(gifFrames, opts);
+  if (previewJson) previewLottie(previewJson); // for quick on-page preview
+  const base = (fileNameInput.value || 'animation');
+  const name = opts.mode === 'zip' ? `${base}.zip` : `${base}.json`;
+  autoDownload(blob, name);
 });
 
 // GIF/Lottie → WebM (preserve timing)
@@ -213,7 +266,7 @@ toVideoBtn.addEventListener('click', async () => {
 
 resetBtn.addEventListener('click',resetAll);
 
-// ==== Helpers ====
+/* ===== Helpers ===== */
 function renderGifCanvases(frames){
   const w=frames[0].dims.width,h=frames[0].dims.height;
   const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;const tctx=tmp.getContext('2d');
@@ -227,23 +280,141 @@ function renderGifCanvases(frames){
   });
 }
 
-async function buildLottieFromGif(frames){
-  const w=frames[0].dims.width,h=frames[0].dims.height;
-  const canvases=renderGifCanvases(frames);
-  const delays=frames.map(f=>(f.delay||10)*10);
-  const fr=30; // logical frame rate
-  let time=0; const assets=[], layers=[];
-  canvases.forEach((c,i)=>{
-    const data=c.toDataURL('image/png');
-    assets.push({id:`img_${i}`,w,h,p:data,e:1});
-    const ip=Math.round((time/1000)*fr);
-    const op=Math.round(((time+delays[i])/1000)*fr);
-    layers.push({ddd:0,ind:i+1,ty:2,refId:`img_${i}`,
-      ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[w/2,h/2,0]},a:{a:0,k:[w/2,h/2,0]},s:{a:0,k:[100,100,100]}},
-      ip,op,st:0,bm:0});
-    time+=delays[i];
+function resizeCanvasFit(srcCanvas, maxW, maxH){
+  const { width:sw, height:sh } = srcCanvas;
+  const scale = Math.min(maxW/sw, maxH/sh, 1);
+  if (scale === 1) return srcCanvas;
+  const dw = Math.max(1, Math.round(sw*scale));
+  const dh = Math.max(1, Math.round(sh*scale));
+  const c = document.createElement('canvas'); c.width = dw; c.height = dh;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(srcCanvas, 0, 0, dw, dh);
+  return c;
+}
+
+async function canvasToWebPBlob(canvas, quality=0.7) {
+  return new Promise(res => canvas.toBlob(b => res(b), 'image/webp', quality));
+}
+
+async function canvasToWebPDataURL(canvas, quality=0.7){
+  const blob = await canvasToWebPBlob(canvas, quality);
+  return await blobToDataURL(blob);
+}
+
+function blobToDataURL(blob){
+  return new Promise(r=>{
+    const fr = new FileReader();
+    fr.onload = () => r(fr.result);
+    fr.readAsDataURL(blob);
   });
-  return {v:"5.7.4",fr,ip:0,op:layers[layers.length-1].op,w,h,nm:"GIF2Lottie",ddd:0,assets,layers};
+}
+
+function hashCanvas(canvas){
+  // quick perceptual-ish hash using tiny resize then toDataURL
+  const s=16;
+  const c=document.createElement('canvas'); c.width=s; c.height=s;
+  const ctx=c.getContext('2d'); ctx.drawImage(canvas,0,0,s,s);
+  return c.toDataURL('image/webp',0.5);
+}
+
+/* Optional quantization: reduces colors before WebP */
+function quantizeCanvasInPlace(canvas, paletteSize = 64){
+  const ctx = canvas.getContext('2d');
+  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const pointContainer = IQ.utils.PointContainer.fromUint8Array(img.data, canvas.width, canvas.height);
+  const distance = new IQ.distance.Euclidean();
+  const palette = IQ.utils.Palette.applyModifiedMedianCut(pointContainer, paletteSize, { distance });
+  const quant = new IQ.image.NearestColor(distance);
+  const out = IQ.applyPalette(pointContainer, palette, quant).toUint8Array();
+  ctx.putImageData(new ImageData(out, canvas.width, canvas.height), 0, 0);
+}
+
+async function buildLottieFromGifOptimized(framesRaw, opts){
+  // 1) Rebuild full GIF frames to canvases
+  const fullCanvases = renderGifCanvases(framesRaw);
+
+  // 2) Downscale + optional quantization
+  const processed = fullCanvases.map(c => resizeCanvasFit(c, opts.maxW, opts.maxH));
+  if (opts.quantize){
+    processed.forEach(c => quantizeCanvasInPlace(c, 48)); // 32–64 is a good range
+  }
+
+  // 3) Deduplicate consecutive identical frames (by hash)
+  const delaysMs = framesRaw.map(f=>(f.delay||10)*10);
+  const uniqueFrames = [];
+  const uniqueDelays = [];
+  let lastHash = null;
+
+  for (let i=0;i<processed.length;i++){
+    const h = hashCanvas(processed[i]);
+    if (h === lastHash && uniqueFrames.length){
+      // extend previous delay
+      uniqueDelays[uniqueDelays.length-1] += delaysMs[i];
+    } else {
+      uniqueFrames.push(processed[i]);
+      uniqueDelays.push(delaysMs[i]);
+      lastHash = h;
+    }
+  }
+
+  // 4) Build Lottie as image sequence layers with correct ip/op at fr=30
+  const w = uniqueFrames[0].width, h = uniqueFrames[0].height;
+  const fr = 30;
+  const layers = [];
+  const assets = [];
+  let time = 0;
+
+  // Output two modes:
+  //  - embedded: base64 webp in JSON (bigger)
+  //  - zip: JSON references files like "images/f_000.webp" (smallest)
+  const willZip = opts.mode === 'zip';
+  const zip = willZip ? new JSZip() : null;
+  const imgFolder = willZip ? zip.folder('images') : null;
+
+  for (let i=0;i<uniqueFrames.length;i++){
+    const c = uniqueFrames[i];
+
+    // Encode WebP
+    const webpBlob = await canvasToWebPBlob(c, opts.webpQ);
+
+    let assetId = `img_${i}`;
+    let refPath;
+
+    if (willZip){
+      const fileName = `f_${String(i).padStart(4,'0')}.webp`;
+      imgFolder.file(fileName, webpBlob);
+      refPath = `images/${fileName}`;
+      assets.push({ id: assetId, w, h, u: "", p: refPath, e: 0 }); // external file path (no base64)
+    } else {
+      const dataURL = await blobToDataURL(webpBlob);
+      assets.push({ id: assetId, w, h, p: dataURL, e: 1 }); // embedded base64
+    }
+
+    const ip = Math.round((time/1000)*fr);
+    const op = Math.round(((time+uniqueDelays[i])/1000)*fr);
+    layers.push({
+      ddd:0, ind:i+1, ty:2, refId:assetId,
+      ks:{ o:{a:0,k:100}, r:{a:0,k:0}, p:{a:0,k:[w/2,h/2,0]}, a:{a:0,k:[w/2,h/2,0]}, s:{a:0,k:[100,100,100]} },
+      ip, op, st:0, bm:0
+    });
+    time += uniqueDelays[i];
+  }
+
+  const lottieJson = { v:"5.7.4", fr, ip:0, op:layers.length? layers[layers.length-1].op : 0, w, h, nm:"GIF2Lottie (WebP seq)", ddd:0, assets, layers };
+
+  if (willZip){
+    // Put JSON in zip
+    zip.file('animation.json', JSON.stringify(lottieJson, null, 2));
+    const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{ level:9 } });
+    // For on-page preview we still need JSON; we can preview it directly:
+    return { blob, previewJson: lottieJson };
+  } else {
+    // Single JSON download
+    const blob = new Blob([JSON.stringify(lottieJson, null, 2)], { type:'application/json' });
+    return { blob, previewJson: lottieJson };
+  }
 }
 
 function prepareFramesForGif(frames,hexColor){
